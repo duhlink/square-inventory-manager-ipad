@@ -14,20 +14,21 @@ const Table = React.forwardRef<
     "relative w-full overflow-auto overscroll-contain",
     "-webkit-overflow-scrolling-touch scroll-smooth",
     "rounded-md border",
+    "max-h-[80vh] sm:max-h-[85vh]",
     containerClassName
   )}>
-    <div className="h-2" /> {/* Padding spacer */}
+    <div className="h-1 sm:h-2" />
     <table
       ref={ref}
       className={cn(
-        "w-full caption-bottom text-sm",
+        "w-full caption-bottom text-xs sm:text-sm",
         "touch-pan-x touch-pan-y",
         "border-separate border-spacing-0",
         className
       )}
       {...props}
     />
-    <div className="h-2" /> {/* Padding spacer */}
+    <div className="h-1 sm:h-2" />
   </div>
 ))
 Table.displayName = "Table"
@@ -36,7 +37,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+  <thead ref={ref} className={cn("[&_tr]:border-b sticky top-0 bg-background z-10", className)} {...props} />
 ))
 TableHeader.displayName = "TableHeader"
 
@@ -59,7 +60,7 @@ const TableFooter = React.forwardRef<
   <tfoot
     ref={ref}
     className={cn(
-      "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
+      "sticky bottom-0 border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
       className
     )}
     {...props}
@@ -82,24 +83,6 @@ const TableRow = React.forwardRef<
 
   const isInteractive = onLongPress || onRowClick
 
-  const content = isInteractive ? (
-    <Ripple
-      className="w-full"
-      color="rgba(0, 0, 0, 0.03)"
-      duration={800}
-    >
-      <div className="relative">
-        {children}
-        <div className="absolute inset-0 pointer-events-none border-b" />
-      </div>
-    </Ripple>
-  ) : (
-    <>
-      {children}
-      <div className="absolute inset-0 pointer-events-none border-b" />
-    </>
-  )
-
   return (
     <tr
       ref={ref}
@@ -115,7 +98,7 @@ const TableRow = React.forwardRef<
       {...(isInteractive ? pressHandlers : {})}
       {...props}
     >
-      {content}
+      {children}
     </tr>
   )
 })
@@ -133,33 +116,20 @@ const TableHead = React.forwardRef<
     longPressDelay: 500
   }) : {}
 
-  const content = isSortable ? (
-    <Ripple
-      className="w-full h-full"
-      color="rgba(0, 0, 0, 0.05)"
-      duration={400}
-    >
-      <div className="p-4 flex items-center">{children}</div>
-    </Ripple>
-  ) : (
-    <div className="p-4">{children}</div>
-  )
-
   return (
     <th
       ref={ref}
       className={cn(
-        "h-12 text-left align-middle font-medium text-muted-foreground p-0",
-        "touch-manipulation select-none",
+        "h-8 px-2 sm:px-4 text-left align-middle font-medium text-muted-foreground text-xs sm:text-sm",
+        "touch-manipulation select-none whitespace-nowrap",
         "[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        "[&>button]:w-full [&>button]:h-full [&>button]:p-4 [&>button]:flex [&>button]:items-center [&>button]:font-medium",
         isSortable && "cursor-pointer",
         className
       )}
       {...(onSort ? pressHandlers : {})}
       {...props}
     >
-      {content}
+      {children}
     </th>
   )
 })
@@ -179,25 +149,13 @@ const TableCell = React.forwardRef<
 
   const isInteractive = isEditable || onCellPress
 
-  const content = isInteractive ? (
-    <Ripple
-      className="w-full h-full"
-      color={isEditable ? "rgba(0, 0, 0, 0.05)" : "rgba(0, 0, 0, 0.1)"}
-    >
-      <div className="p-4">{children}</div>
-    </Ripple>
-  ) : (
-    <div className="p-4">{children}</div>
-  )
-
   return (
     <td
       ref={ref}
       className={cn(
-        "align-middle min-h-[3.5rem] p-0",
+        "p-1 sm:p-2 align-middle h-8 text-xs sm:text-sm",
         "touch-manipulation select-none",
         "[&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        "[&>button]:w-full [&>button]:h-full [&>button]:p-4 [&>button]:flex [&>button]:items-center",
         isEditable && "cursor-text",
         !isEditable && onCellPress && "cursor-pointer",
         className
@@ -205,7 +163,7 @@ const TableCell = React.forwardRef<
       {...(onCellPress ? pressHandlers : {})}
       {...props}
     >
-      {content}
+      {children}
     </td>
   )
 })
@@ -217,7 +175,7 @@ const TableCaption = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <caption
     ref={ref}
-    className={cn("mt-4 text-sm text-muted-foreground", className)}
+    className={cn("mt-2 sm:mt-4 text-xs sm:text-sm text-muted-foreground", className)}
     {...props}
   />
 ))

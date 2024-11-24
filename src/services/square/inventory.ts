@@ -1,18 +1,81 @@
 import { squareClient, SquareResponse, RATE_LIMIT, INVENTORY_STATES } from './config'
-import { delay } from '@/lib/utils'
+import { delay } from '../../lib/utils'
+import * as Sentry from '@sentry/nextjs'
+
+// Type-safe LRU Cache implementation
+class LRUCache {
+  private cache: Map<string, any>
+  private readonly maxSize: number
+
+  constructor(maxSize: number) {
+    this.cache = new Map()
+    this.maxSize = maxSize
+  }
+
+  private isValidKey(key: unknown): key is string {
+    return typeof key === 'string' && key.length > 0
+  }
+
+  get(key: unknown): any | undefined {
+    if (!this.isValidKey(key)) return undefined
+    const item = this.cache.get(key)
+    if (item !== undefined) {
+      this.cache.delete(key)
+      this.cache.set(key, item)
+    }
+    return item
+  }
+
+  set(key: unknown, value: any): void {
+    if (!this.isValidKey(key)) return
+    
+    if (this.cache.size >= this.maxSize) {
+      const firstKey = Array.from(this.cache.keys())[0]
+      if (firstKey) {
+        this.cache.delete(firstKey)
+      }
+    }
+    
+    this.cache.set(key, value)
+  }
+
+  clear(): void {
+    this.cache.clear()
+  }
+}
 
 export class InventoryService {
   private static instance: InventoryService
+  private requestQueue: Promise<any>[] = []
+  private cache: LRUCache
+  private batchSize: number = 100
   private requestCount: number = 0
   private lastRequestTime: number = Date.now()
 
-  private constructor() {}
+  private constructor() {
+    this.cache = new LRUCache(1000)
+    this.requestQueue = []
+    console.log('Inventory Service: Square client config:', {
+      hasInventoryApi: !!squareClient?.inventoryApi,
+      isInitialized: !!squareClient
+    })
+  }
 
   public static getInstance(): InventoryService {
     if (!InventoryService.instance) {
       InventoryService.instance = new InventoryService()
     }
     return InventoryService.instance
+  }
+
+  private async processQueue(): Promise<void> {
+    while (this.requestQueue.length > 0) {
+      const request = this.requestQueue.shift()
+      if (request) {
+        await request
+      }
+      await this.checkRateLimit()
+    }
   }
 
   private async checkRateLimit() {
@@ -29,33 +92,72 @@ export class InventoryService {
     this.lastRequestTime = now
   }
 
-  async retrieveInventoryCounts(catalogItemIds: string[]): Promise<SquareResponse<Map<string, number>>> {
+  private serializeResponse(obj: any): any {
+    if (!obj) return obj
+    try {
+      return JSON.parse(JSON.stringify(obj, (_, value) =>
+        typeof value === 'bigint' ? Number(value) : value
+      ))
+    } catch (error) {
+      Sentry.captureException(error, {
+        extra: { context: 'serializeResponse', objectType: typeof obj }
+      })
+      return obj
+    }
+  }
+
+  async retrieveInventoryCounts(items: { catalogItemId: string, variationId: string }[]): Promise<SquareResponse<Map<string, number>>> {
+    const cacheKey = `inventory_counts_${items.map(i => i.variationId).join('_')}`
+    const cachedData = this.cache.get(cacheKey)
+    if (cachedData) {
+      return cachedData
+    }
+
     try {
       await this.checkRateLimit()
 
-      const { result } = await squareClient.inventoryApi.batchRetrieveInventoryCounts({
-        catalogObjectIds: catalogItemIds,
-        states: [INVENTORY_STATES.IN_STOCK]
-      })
+      if (!squareClient?.inventoryApi) {
+        throw new Error('Square Inventory API is not initialized')
+      }
 
-      if (!result.counts) {
-        return { success: true, data: new Map() }
+      const batches = []
+      for (let i = 0; i < items.length; i += this.batchSize) {
+        batches.push(items.slice(i, i + this.batchSize))
       }
 
       const inventoryCounts = new Map<string, number>()
-      
-      result.counts.forEach(count => {
-        if (count.catalogObjectId && count.quantity) {
-          inventoryCounts.set(
-            count.catalogObjectId,
-            parseInt(count.quantity)
-          )
-        }
-      })
 
-      return { success: true, data: inventoryCounts }
+      for (const batch of batches) {
+        const { result } = await squareClient.inventoryApi.batchRetrieveInventoryCounts({
+          catalogObjectIds: batch.map(item => item.variationId),
+          states: [INVENTORY_STATES.IN_STOCK]
+        })
+
+        if (result.counts) {
+          result.counts.forEach(count => {
+            if (count.catalogObjectId) {
+              const item = batch.find(i => i.variationId === count.catalogObjectId)
+              if (item && count.quantity) {
+                inventoryCounts.set(
+                  item.catalogItemId,
+                  parseInt(count.quantity)
+                )
+              }
+            }
+          })
+        }
+
+        await this.checkRateLimit()
+      }
+
+      const response = { success: true, data: inventoryCounts }
+      this.cache.set(cacheKey, response)
+      return response
+
     } catch (error: any) {
-      console.error('Error retrieving inventory counts:', error)
+      Sentry.captureException(error, {
+        extra: { context: 'retrieve_inventory_counts' }
+      })
       return {
         success: false,
         error: {
@@ -68,7 +170,7 @@ export class InventoryService {
   }
 
   async adjustInventory(
-    catalogItemId: string,
+    variationId: string,
     quantity: number,
     fromState = INVENTORY_STATES.IN_STOCK,
     toState = INVENTORY_STATES.SOLD
@@ -76,24 +178,30 @@ export class InventoryService {
     try {
       await this.checkRateLimit()
 
+      if (!squareClient?.inventoryApi) {
+        throw new Error('Square Inventory API is not initialized')
+      }
+
       await squareClient.inventoryApi.batchChangeInventory({
         idempotencyKey: crypto.randomUUID(),
-        changes: [
-          {
-            type: 'ADJUSTMENT',
-            adjustment: {
-              catalogObjectId: catalogItemId,
-              fromState,
-              toState,
-              quantity: quantity.toString()
-            }
+        changes: [{
+          type: 'ADJUSTMENT',
+          adjustment: {
+            catalogObjectId: variationId,
+            fromState,
+            toState,
+            quantity: quantity.toString()
           }
-        ]
+        }]
       })
 
+      this.cache.clear() // Invalidate cache after adjustment
       return { success: true }
+
     } catch (error: any) {
-      console.error('Error adjusting inventory:', error)
+      Sentry.captureException(error, {
+        extra: { context: 'adjust_inventory', variationId }
+      })
       return {
         success: false,
         error: {
@@ -106,23 +214,25 @@ export class InventoryService {
   }
 
   async setInventoryLevel(
-    catalogItemId: string,
+    variationId: string,
     quantity: number,
     state = INVENTORY_STATES.IN_STOCK
   ): Promise<SquareResponse<void>> {
     try {
       await this.checkRateLimit()
 
-      // First, get the current inventory level
+      if (!squareClient?.inventoryApi) {
+        throw new Error('Square Inventory API is not initialized')
+      }
+
       const { result } = await squareClient.inventoryApi.retrieveInventoryCount(
-        catalogItemId,
+        variationId,
         state
       )
 
       if (!result.counts?.[0]?.quantity) {
-        // If no current inventory, set it directly
         await this.adjustInventory(
-          catalogItemId,
+          variationId,
           quantity,
           INVENTORY_STATES.NONE,
           state
@@ -133,17 +243,15 @@ export class InventoryService {
 
         if (difference !== 0) {
           if (difference > 0) {
-            // Add inventory
             await this.adjustInventory(
-              catalogItemId,
+              variationId,
               difference,
               INVENTORY_STATES.NONE,
               state
             )
           } else {
-            // Remove inventory
             await this.adjustInventory(
-              catalogItemId,
+              variationId,
               Math.abs(difference),
               state,
               INVENTORY_STATES.WASTE
@@ -152,9 +260,13 @@ export class InventoryService {
         }
       }
 
+      this.cache.clear() // Invalidate cache after level change
       return { success: true }
+
     } catch (error: any) {
-      console.error('Error setting inventory level:', error)
+      Sentry.captureException(error, {
+        extra: { context: 'set_inventory_level', variationId }
+      })
       return {
         success: false,
         error: {
@@ -167,29 +279,46 @@ export class InventoryService {
   }
 
   async batchSetInventoryLevels(
-    items: { catalogItemId: string; quantity: number }[]
+    items: { variationId: string; quantity: number }[]
   ): Promise<SquareResponse<void>> {
     try {
       await this.checkRateLimit()
 
-      const changes = items.map(item => ({
-        type: 'PHYSICAL_COUNT',
-        physicalCount: {
-          catalogObjectId: item.catalogItemId,
-          state: INVENTORY_STATES.IN_STOCK,
-          quantity: item.quantity.toString(),
-          occurredAt: new Date().toISOString()
-        }
-      }))
+      if (!squareClient?.inventoryApi) {
+        throw new Error('Square Inventory API is not initialized')
+      }
 
-      await squareClient.inventoryApi.batchChangeInventory({
-        idempotencyKey: crypto.randomUUID(),
-        changes
-      })
+      const batches = []
+      for (let i = 0; i < items.length; i += this.batchSize) {
+        batches.push(items.slice(i, i + this.batchSize))
+      }
 
+      for (const batch of batches) {
+        const changes = batch.map(item => ({
+          type: 'PHYSICAL_COUNT',
+          physicalCount: {
+            catalogObjectId: item.variationId,
+            state: INVENTORY_STATES.IN_STOCK,
+            quantity: item.quantity.toString(),
+            occurredAt: new Date().toISOString()
+          }
+        }))
+
+        await squareClient.inventoryApi.batchChangeInventory({
+          idempotencyKey: crypto.randomUUID(),
+          changes
+        })
+
+        await this.checkRateLimit()
+      }
+
+      this.cache.clear() // Invalidate cache after batch update
       return { success: true }
+
     } catch (error: any) {
-      console.error('Error batch setting inventory levels:', error)
+      Sentry.captureException(error, {
+        extra: { context: 'batch_set_inventory_levels' }
+      })
       return {
         success: false,
         error: {

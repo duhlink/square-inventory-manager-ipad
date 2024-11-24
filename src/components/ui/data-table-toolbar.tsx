@@ -5,7 +5,7 @@ import { Table } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DataTableViewOptions } from "@/components/ui/data-table-view-options"
-import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"
+import { DataTableCategories } from "@/components/ui/data-table-categories"
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
@@ -25,6 +25,9 @@ export function DataTableToolbar<TData>({
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
 
+  // Find categories from filterableColumns
+  const categoriesFilter = filterableColumns.find(col => col.id === "categories")
+
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-2">
       <div className="flex flex-1 flex-col sm:flex-row gap-4 sm:items-center">
@@ -34,32 +37,24 @@ export function DataTableToolbar<TData>({
           onChange={(event) =>
             table.getColumn("name")?.setFilterValue(event.target.value)
           }
-          className="h-10 w-full sm:w-[250px] lg:w-[350px]"
+          className="h-8 w-full sm:w-[150px] lg:w-[250px]"
         />
-        <div className="flex flex-wrap gap-2">
-          {filterableColumns.map(({ id, title, options }) => {
-            const column = table.getColumn(id)
-            if (!column) return null
-            return (
-              <DataTableFacetedFilter
-                key={id}
-                column={column}
-                title={title}
-                options={options}
-              />
-            )
-          })}
-          {isFiltered && (
-            <Button
-              variant="ghost"
-              onClick={() => table.resetColumnFilters()}
-              className="h-10 px-3 lg:px-4"
-            >
-              Reset
-              <Cross2Icon className="ml-2 h-5 w-5" />
-            </Button>
-          )}
-        </div>
+        {categoriesFilter && (
+          <DataTableCategories 
+            table={table}
+            categories={categoriesFilter.options}
+          />
+        )}
+        {isFiltered && (
+          <Button
+            variant="ghost"
+            onClick={() => table.resetColumnFilters()}
+            className="h-8 px-2 lg:px-3"
+          >
+            Reset
+            <Cross2Icon className="ml-2 h-4 w-4" />
+          </Button>
+        )}
       </div>
       <DataTableViewOptions table={table} />
     </div>

@@ -1,11 +1,26 @@
 import { Client, Environment } from 'square'
 
+if (!process.env.NEXT_PUBLIC_SQUARE_ACCESS_TOKEN) {
+  throw new Error('NEXT_PUBLIC_SQUARE_ACCESS_TOKEN is not configured')
+}
+
+if (!process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT) {
+  throw new Error('NEXT_PUBLIC_SQUARE_ENVIRONMENT is not configured')
+}
+
 // Initialize the Square client
 export const squareClient = new Client({
-  accessToken: process.env.SQUARE_ACCESS_TOKEN,
-  environment: process.env.NODE_ENV === 'production' 
+  accessToken: process.env.NEXT_PUBLIC_SQUARE_ACCESS_TOKEN,
+  environment: process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT === 'production' 
     ? Environment.Production 
-    : Environment.Sandbox
+    : Environment.Sandbox,
+  userAgentDetail: 'canyon-market' // Add custom user agent for better tracking
+})
+
+// Log client initialization
+console.log('Square client initialized:', {
+  environment: process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT,
+  hasAccessToken: !!process.env.NEXT_PUBLIC_SQUARE_ACCESS_TOKEN
 })
 
 // Square API endpoints
@@ -69,5 +84,6 @@ export const INVENTORY_STATES = {
   OUT_OF_STOCK: 'OUT_OF_STOCK',
   WASTE: 'WASTE',
   UNLINKED_RETURN: 'UNLINKED_RETURN',
-  SOLD: 'SOLD'
+  SOLD: 'SOLD',
+  NONE: 'NONE'
 }
