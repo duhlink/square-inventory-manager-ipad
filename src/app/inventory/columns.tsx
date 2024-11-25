@@ -4,7 +4,7 @@ import { type ColumnDef } from "@tanstack/react-table"
 import { InventoryItem } from "./types"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpDown, MoreHorizontal } from "lucide-react"
+import { ChevronDown, MoreHorizontal } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,6 +16,31 @@ import {
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 
 export const columns: ColumnDef<InventoryItem>[] = [
+  {
+    id: "image",
+    header: ({ column }) => (
+      <DataTableColumnHeader 
+        column={column} 
+        title="Image"
+        className="w-[50px]"
+      />
+    ),
+    cell: ({ row }) => {
+      const imageUrl = row.original.imageUrl
+      return imageUrl ? (
+        <div className="w-[50px] h-[50px] relative">
+          <img
+            src={imageUrl}
+            alt={row.getValue("name")}
+            className="object-cover w-full h-full rounded-sm"
+          />
+        </div>
+      ) : (
+        <div className="w-[50px] h-[50px] bg-muted rounded-sm" />
+      )
+    },
+    enableSorting: false,
+  },
   {
     id: "name",
     accessorKey: "name",
@@ -34,30 +59,67 @@ export const columns: ColumnDef<InventoryItem>[] = [
     enableSorting: true,
   },
   {
-    id: "categories",
+    id: "sku",
+    accessorKey: "sku",
+    header: ({ column }) => (
+      <DataTableColumnHeader 
+        column={column} 
+        title="SKU"
+      />
+    ),
+    cell: ({ row }) => (
+      <div className="font-mono text-sm">
+        {row.getValue("sku") || "N/A"}
+      </div>
+    ),
+    enableSorting: true,
+  },
+  {
     accessorKey: "categories",
     header: ({ column }) => (
       <DataTableColumnHeader 
         column={column} 
         title="Categories"
-        className="hidden md:table-cell"
       />
     ),
     cell: ({ row }) => {
-      const categories = (row.getValue("categories") as string[]) || []
+      const categories = row.original.categories || []
+      if (!categories.length) return <span className="text-muted-foreground text-sm">No categories</span>
+
       return (
-        <div className="hidden md:flex flex-wrap gap-1">
-          {categories.map((cat, i) => (
-            <Badge key={i} variant="outline" className="text-xs">
-              {cat}
-            </Badge>
-          ))}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="ghost" 
+              className="h-8 flex items-center gap-1 hover:bg-accent hover:text-accent-foreground"
+            >
+              <Badge variant="outline" className="text-xs">
+                {categories[0]}
+              </Badge>
+              {categories.length > 1 && (
+                <Badge variant="secondary" className="text-xs">
+                  +{categories.length - 1}
+                </Badge>
+              )}
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-[200px]">
+            <DropdownMenuLabel>Categories</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {categories.map((category, index) => (
+              <DropdownMenuItem key={index} className="text-sm">
+                {category}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )
     },
     filterFn: (row, id, value: string[]) => {
-      const categories = (row.getValue(id) as string[]) || []
-      return value.some(val => categories.includes(val))
+      const categoryIds = row.original.categoryIds as string[]
+      if (!value?.length) return true // Show all when no filter is applied
+      return value.some(val => categoryIds?.includes(val))
     },
     enableSorting: true,
   },
@@ -87,40 +149,6 @@ export const columns: ColumnDef<InventoryItem>[] = [
           )}
         </div>
       )
-    },
-    enableSorting: true,
-  },
-  {
-    id: "status",
-    accessorKey: "status",
-    header: ({ column }) => (
-      <DataTableColumnHeader 
-        column={column} 
-        title="Status"
-        className="hidden sm:table-cell"
-      />
-    ),
-    cell: ({ row }) => {
-      const status = row.getValue("status") as string
-      return (
-        <div className="hidden sm:block">
-          <Badge
-            variant={
-              status === "in_stock"
-                ? "default"
-                : status === "low_stock"
-                ? "warning"
-                : "destructive"
-            }
-            className="text-xs px-1"
-          >
-            {status.replace("_", " ")}
-          </Badge>
-        </div>
-      )
-    },
-    filterFn: (row, id, value: string[]) => {
-      return value.includes(row.getValue(id))
     },
     enableSorting: true,
   },
@@ -190,15 +218,11 @@ export const columns: ColumnDef<InventoryItem>[] = [
       <DataTableColumnHeader 
         column={column} 
         title="Vendor"
-        className="hidden md:table-cell"
       />
     ),
     cell: ({ row }) => (
-      <div className="hidden md:block max-w-[150px]">
+      <div className="max-w-[150px]">
         <span className="truncate block">{row.getValue("vendorName") || "No Vendor"}</span>
-        <span className="text-xs text-muted-foreground truncate block">
-          {row.original.vendorCode || "No Code"}
-        </span>
       </div>
     ),
     enableSorting: true,
@@ -223,8 +247,6 @@ export const columns: ColumnDef<InventoryItem>[] = [
               <div className="font-medium">{v.name}</div>
               <div className="text-muted-foreground">
                 SKU: {v.sku || "N/A"}
-                {v.gtin && ` • GTIN: ${v.gtin}`}
-                {v.weight && ` • ${v.weight.value}${v.weight.unit}`}
               </div>
             </div>
           ))}

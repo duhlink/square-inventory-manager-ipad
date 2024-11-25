@@ -3,38 +3,45 @@ export type InventoryItem = {
   name: string
   description: string
   sku: string
-  category: string
-  categories: string[] // Additional categorization
+  categories: string[] // Category names
+  categoryIds: string[] // Category IDs for Square API
   price: number
-  cost: number
+  unitCost: number
   quantity: number
   reorderPoint: number
-  vendor: string
-  vendorCode: string // Added vendor code
-  vendorName: string // Added explicit vendor name
-  unitType: string // Added unit type (per item, per gallon, per foot)
-  unitCost: number // Added unit cost
-  status: 'in_stock' | 'low_stock' | 'out_of_stock'
+  vendorId: string
+  vendorName: string
+  vendorCode: string
+  unitType: string
+  measurementUnitId: string
   lastUpdated: string
   updatedBy: string
-  variations?: ItemVariation[]
-  // Square API specific fields
-  squareId?: string
-  squareCatalogVersion?: number
-  squareUpdatedAt?: string
+  squareId: string
+  squareCatalogVersion: number
+  squareUpdatedAt: string
+  variations: ItemVariation[]
+  isTaxable: boolean
+  visibility: 'PUBLIC' | 'PRIVATE'
+  trackInventory: boolean
+  imageUrl?: string
+  imageId?: string
 }
 
 export type ItemVariation = {
   id: string
   name: string
   sku: string
-  gtin?: string // Added Global Trade Item Number
   price: number
   cost: number
-  quantity: number
-  weight?: {
-    value: number
-    unit: 'oz' | 'lb' | 'g' | 'kg'
+  upc?: string
+  measurementUnit: string
+  vendorSku?: string
+  priceMoney?: {
+    amount: number
+    currency: string
+  }
+  pricing?: {
+    cost: number
   }
 }
 
@@ -53,7 +60,7 @@ export type InventoryAction = {
 export type Vendor = {
   id: string
   name: string
-  code: string // Added vendor code
+  code: string
   email: string
   phone: string
   address: string

@@ -1,103 +1,173 @@
 "use client"
 
-import { DropdownMenuTrigger } from "@radix-ui/react-dropdown-menu"
-import { Tags, Check, X } from "lucide-react"
-import { Table } from "@tanstack/react-table"
-
+import * as React from "react"
+import { Check, PlusCircle } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Separator } from "@/components/ui/separator"
+import { Table } from "@tanstack/react-table"
 
 interface DataTableCategoriesProps<TData> {
   table: Table<TData>
-  categories: {
-    label: string
-    value: string
-  }[]
 }
 
 export function DataTableCategories<TData>({
   table,
-  categories,
 }: DataTableCategoriesProps<TData>) {
-  const categoriesColumn = table.getColumn("categories")
-  const selectedValues = (categoriesColumn?.getFilterValue() as string[]) || []
+  const [categories, setCategories] = React.useState<{ label: string; value: string }[]>([])
+  const [open, setOpen] = React.useState(false)
+  const [selectedValues, setSelectedValues] = React.useState<string[]>([])
 
-  const toggleCategory = (value: string) => {
-    if (!categoriesColumn) return
-
-    const currentFilters = [...selectedValues]
-    const index = currentFilters.indexOf(value)
-
-    if (index === -1) {
-      currentFilters.push(value)
-    } else {
-      currentFilters.splice(index, 1)
+  React.useEffect(() => {
+    // Fetch categories when component mounts
+    async function fetchCategories() {
+      try {
+        const response = await fetch('/api/square/catalog/categories')
+        const result = await response.json()
+        if (result.success) {
+          console.log('Fetched categories:', result.data)
+          setCategories(result.data)
+        } else {
+          console.error('Failed to fetch categories:', result.error)
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error)
+      }
     }
 
-    categoriesColumn.setFilterValue(currentFilters.length ? currentFilters : undefined)
-  }
+    fetchCategories()
+  }, [])
+
+  React.useEffect(() => {
+    // Update table filters when selected values change
+    const column = table.getColumn("categories")
+    if (column) {
+      console.log('Setting category filter:', selectedValues)
+      column.setFilterValue(selectedValues.length ? selectedValues : undefined)
+    } else {
+      console.warn('Category column not found')
+    }
+  }, [selectedValues, table])
+
+  // Get the selected category labels for display
+  const getSelectedLabels = React.useCallback((values: string[]) => {
+    return categories
+      .filter(cat => values.includes(cat.value))
+      .map(cat => cat.label)
+  }, [categories])
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
         <Button
           variant="outline"
           size="sm"
-          className="h-8 lg:h-10 px-3 lg:px-4 flex items-center gap-2"
-          title="Filter by categories"
+          className="h-8 border-dashed"
         >
-          <Tags className="h-4 w-4" />
-          <span className="hidden sm:inline">View Categories</span>
-          {selectedValues.length > 0 && (
-            <div className="ml-2 rounded-md bg-primary/20 px-1 text-xs font-medium leading-none text-primary">
-              {selectedValues.length}
-            </div>
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Categories
+          {selectedValues?.length > 0 && (
+            <>
+              <Separator orientation="vertical" className="mx-2 h-4" />
+              <Badge
+                variant="secondary"
+                className="rounded-sm px-1 font-normal lg:hidden"
+              >
+                {selectedValues.length}
+              </Badge>
+              <div className="hidden space-x-1 lg:flex">
+                {selectedValues.length > 2 ? (
+                  <Badge
+                    variant="secondary"
+                    className="rounded-sm px-1 font-normal"
+                  >
+                    {selectedValues.length} selected
+                  </Badge>
+                ) : (
+                  getSelectedLabels(selectedValues).map((label) => (
+                    <Badge
+                      variant="secondary"
+                      key={label}
+                      className="rounded-sm px-1 font-normal"
+                    >
+                      {label}
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </>
           )}
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[200px]">
-        <DropdownMenuLabel className="py-2 px-4 text-sm font-semibold">
-          Toggle Categories
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <div className="max-h-[400px] overflow-y-auto">
-          {categories.map((category) => {
-            const isSelected = selectedValues.includes(category.value)
-            return (
-              <DropdownMenuCheckboxItem
-                key={category.value}
-                className={cn(
-                  "py-3 px-4 cursor-pointer hover:bg-muted flex items-center justify-between gap-2",
-                  "focus:bg-muted focus:text-foreground"
-                )}
-                checked={isSelected}
-                onCheckedChange={() => toggleCategory(category.value)}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  {isSelected ? (
-                    <Check className="h-4 w-4 text-green-500 flex-none" />
-                  ) : (
-                    <X className="h-4 w-4 text-red-500 flex-none" />
-                  )}
-                  <span className={cn(
-                    "text-sm truncate",
-                    isSelected ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
-                  )}>
-                    {category.label}
-                  </span>
-                </div>
-              </DropdownMenuCheckboxItem>
-            )
-          })}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </PopoverTrigger>
+      <PopoverContent className="w-[200px] p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search categories..." />
+          <CommandList>
+            <CommandEmpty>No categories found.</CommandEmpty>
+            <CommandGroup>
+              {categories.map((option) => {
+                const isSelected = selectedValues.includes(option.value)
+                return (
+                  <CommandItem
+                    key={option.value}
+                    onSelect={() => {
+                      if (isSelected) {
+                        setSelectedValues(selectedValues.filter((value) => value !== option.value))
+                      } else {
+                        setSelectedValues([...selectedValues, option.value])
+                      }
+                      setOpen(true) // Keep the popover open
+                    }}
+                  >
+                    <div
+                      className={cn(
+                        "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                        isSelected
+                          ? "bg-primary text-primary-foreground"
+                          : "opacity-50 [&_svg]:invisible"
+                      )}
+                    >
+                      <Check className={cn("h-4 w-4")} />
+                    </div>
+                    <span>{option.label}</span>
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+            {selectedValues.length > 0 && (
+              <>
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem
+                    onSelect={() => {
+                      setSelectedValues([])
+                      setOpen(false)
+                    }}
+                    className="justify-center text-center"
+                  >
+                    Clear filters
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   )
 }

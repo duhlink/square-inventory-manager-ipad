@@ -1,221 +1,166 @@
 import { NextResponse } from 'next/server'
-import { squareClient } from '../../../../services/square/config'
+import { squareClient } from '@/services/square/config'
+import { getVendorName } from '@/services/square/vendors'
+import { collectObjectIds, getCategoryNames, getMeasurementUnitNames, getImageUrls } from '@/services/square/catalog'
 import * as Sentry from '@sentry/nextjs'
-import { CatalogObject, SearchCatalogItemsResponse } from 'square'
+import { CatalogObject, Money } from 'square'
 
-// Extend Square's type to include relatedObjects
-interface ExtendedSearchCatalogItemsResponse extends SearchCatalogItemsResponse {
-  relatedObjects?: CatalogObject[]
-}
-
-// Simple in-memory cache
-let cache: {
-  data: any
-  timestamp: number
-} | null = null;
-
-const CACHE_DURATION = 60 * 1000; // 1 minute cache
-
-// Helper function to safely serialize any object with BigInt values
-const safeSerialize = (obj: any): any => {
-  try {
-    return JSON.parse(JSON.stringify(obj, (key, value) => 
-      typeof value === 'bigint' ? value.toString() : value
-    ))
-  } catch (error) {
-    console.error('Serialization error:', error)
-    return String(obj)
+// Use type assertion instead of interface extension
+type ExtendedCatalogItemVariation = CatalogObject & {
+  itemVariationData?: {
+    itemId?: string
+    name?: string
+    sku?: string
+    ordinal?: number
+    pricingType?: string
+    priceMoney?: Money
+    locationOverrides?: Array<{
+      locationId: string
+      trackInventory?: boolean
+      soldOut?: boolean
+    }>
+    measurementUnitId?: string
+    itemVariationVendorInfos?: Array<{
+      itemVariationVendorInfoData: {
+        vendorId: string
+        sku?: string
+        priceMoney?: Money
+      }
+    }>
   }
 }
 
 export async function GET() {
   try {
-    // Check cache first
-    if (cache && (Date.now() - cache.timestamp) < CACHE_DURATION) {
-      console.log('Returning cached catalog data')
-      return new NextResponse(JSON.stringify(cache.data), {
-        headers: { 'Content-Type': 'application/json' }
-      })
-    }
-
     if (!squareClient?.catalogApi) {
       throw new Error('Square catalog API is not properly initialized')
     }
 
     console.log('Fetching catalog items...')
-    const catalogResponse = await squareClient.catalogApi.searchCatalogItems({
-      includeRelatedObjects: true
-    } as any) // Type assertion needed due to Square types
+    const { result } = await squareClient.catalogApi.listCatalog(
+      undefined,
+      'ITEM'
+    )
 
-    console.log('Catalog items:', catalogResponse.result.items?.length || 0)
-
-    if (!catalogResponse.result.items) {
-      throw new Error('No catalog items found')
+    if (!result.objects) {
+      return NextResponse.json({
+        success: true,
+        data: []
+      })
     }
 
-    // Process and combine the data
-    const items = catalogResponse.result.items
-      .filter(item => item.type === 'ITEM')
-      .map(item => {
-        const variations = item.itemData?.variations?.map(variation => ({
-          id: variation.id,
-          name: variation.itemVariationData?.name || '',
-          sku: variation.itemVariationData?.sku || '',
-          price: variation.itemVariationData?.priceMoney?.amount 
-            ? Number(variation.itemVariationData.priceMoney.amount) / 100
-            : 0,
-          cost: variation.itemVariationData?.priceMoney?.amount 
-            ? Number(variation.itemVariationData.priceMoney.amount) / 200
-            : 0,
-          quantity: 0
-        })) || []
+    // Get all active items
+    const activeItems = result.objects.filter(item => item.type === 'ITEM' && !item.isDeleted)
 
-        // Get category from related objects
-        const categoryId = item.itemData?.categoryId
-        const extendedResult = catalogResponse.result as ExtendedSearchCatalogItemsResponse
-        const category = categoryId && extendedResult.relatedObjects
-          ? extendedResult.relatedObjects.find(
-              (obj: CatalogObject) => obj.type === 'CATEGORY' && obj.id === categoryId
-            )?.categoryData?.name || ''
-          : ''
+    // Collect all object IDs that need to be fetched
+    const { categoryIds, measurementUnitIds, imageIds } = collectObjectIds(activeItems)
 
-        const price = variations[0]?.price || 0
+    // Batch fetch all needed data
+    const [categoryNames, unitMap, imageMap] = await Promise.all([
+      getCategoryNames(categoryIds),
+      getMeasurementUnitNames(measurementUnitIds),
+      getImageUrls(imageIds)
+    ])
 
-        return {
+    // Map items with resolved data
+    const items = await Promise.all(
+      activeItems.map(async item => {
+        // Get vendor info from first variation if available
+        const firstVariation = item.itemData?.variations?.[0] as ExtendedCatalogItemVariation
+        const vendorInfo = firstVariation?.itemVariationData?.itemVariationVendorInfos?.[0]
+        const vendorId = vendorInfo?.itemVariationVendorInfoData?.vendorId || 'WBEGKGP7O4ZWECWE'
+        
+        // Get vendor name using our vendor service
+        const vendorName = await getVendorName(vendorId)
+
+        // Get measurement unit name if available
+        const measurementUnitId = firstVariation?.itemVariationData?.measurementUnitId
+        const unitType = measurementUnitId 
+          ? unitMap.get(measurementUnitId) || 'per item'
+          : 'per item'
+
+        // Get category names
+        const itemCategoryIds = (item.itemData?.categories || []).map(c => c.id).filter((id): id is string => !!id)
+        const categories = itemCategoryIds.map((id, index) => categoryNames[index] || 'Unknown Category')
+
+        // Get image URL if available
+        const imageId = item.itemData?.imageIds?.[0]
+        const imageUrl = imageId ? imageMap.get(imageId) : undefined
+
+        // Map variations
+        const variations = await Promise.all((item.itemData?.variations || []).map(async variation => {
+          const extendedVariation = variation as ExtendedCatalogItemVariation
+          const vendorInfo = extendedVariation.itemVariationData?.itemVariationVendorInfos?.[0]
+          const measurementUnitId = extendedVariation.itemVariationData?.measurementUnitId
+          const unitName = measurementUnitId 
+            ? unitMap.get(measurementUnitId) || 'per item'
+            : 'per item'
+          
+          return {
+            id: variation.id,
+            name: extendedVariation.itemVariationData?.name || '',
+            sku: extendedVariation.itemVariationData?.sku || '',
+            price: extendedVariation.itemVariationData?.priceMoney?.amount 
+              ? Number(extendedVariation.itemVariationData.priceMoney.amount) / 100 
+              : 0,
+            cost: vendorInfo?.itemVariationVendorInfoData?.priceMoney?.amount
+              ? Number(vendorInfo.itemVariationVendorInfoData.priceMoney.amount) / 100
+              : 0,
+            measurementUnit: unitName,
+            vendorSku: vendorInfo?.itemVariationVendorInfoData?.sku
+          }
+        }))
+
+        // Map to our InventoryItem format
+        const mappedItem = {
           id: item.id,
           name: item.itemData?.name || '',
           description: item.itemData?.description || '',
           sku: variations[0]?.sku || '',
-          category,
-          price,
-          cost: price * 0.5,
-          quantity: 0,
+          categories,
+          categoryIds: itemCategoryIds,
+          price: variations[0]?.price || 0,
+          unitCost: variations[0]?.cost || 0,
+          quantity: 0, // We'll handle inventory separately
           reorderPoint: 5,
-          vendor: 'Default Vendor',
-          status: 'in_stock',
+          vendorId,
+          vendorName,
+          vendorCode: vendorId,
+          unitType,
+          measurementUnitId: measurementUnitId || '',
           lastUpdated: item.updatedAt || new Date().toISOString(),
           updatedBy: 'system',
           squareId: item.id,
           squareCatalogVersion: Number(item.version || 0),
-          squareUpdatedAt: item.updatedAt,
-          variations
+          squareUpdatedAt: item.updatedAt || '',
+          variations,
+          isTaxable: item.itemData?.isTaxable || false,
+          visibility: item.itemData?.availableOnline ? 'PUBLIC' : 'PRIVATE',
+          trackInventory: variations[0]?.measurementUnit ? true : false,
+          imageUrl,
+          imageId
         }
+
+        return mappedItem
       })
+    )
 
-    console.log(`Processed ${items.length} catalog items`)
-
-    const response = {
+    return NextResponse.json({
       success: true,
       data: items
-    }
-
-    // Update cache
-    cache = {
-      data: response,
-      timestamp: Date.now()
-    }
-
-    return new NextResponse(JSON.stringify(response), {
-      headers: { 'Content-Type': 'application/json' }
     })
 
   } catch (error: any) {
     console.error('Error fetching catalog:', error)
-
-    // Clear cache on error
-    cache = null
-
     Sentry.captureException(error, {
       extra: { context: 'catalog_api_route' }
     })
-
     return NextResponse.json({ 
       success: false,
       error: {
         code: error.code || 'UNKNOWN_ERROR',
         message: error.message || 'An unexpected error occurred',
         details: error
-      }
-    }, { status: 500 })
-  }
-}
-
-export async function PUT(request: Request) {
-  try {
-    const body = await request.json()
-
-    if (!squareClient?.catalogApi) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: 'INITIALIZATION_ERROR',
-          message: 'Square catalog API is not properly initialized'
-        }
-      }, { status: 500 })
-    }
-
-    // Handle single update request
-    if (!body || typeof body !== 'object' || !body.id) {
-      return NextResponse.json({
-        success: false,
-        error: {
-          code: 'INVALID_REQUEST',
-          message: 'Invalid request body'
-        }
-      }, { status: 400 })
-    }
-
-    const { result } = await squareClient.catalogApi.batchUpsertCatalogObjects({
-      idempotencyKey: crypto.randomUUID(),
-      batches: [{
-        objects: [{
-          type: 'ITEM',
-          id: body.squareId!,
-          version: BigInt(body.squareCatalogVersion || 0),
-          itemData: {
-            name: body.name,
-            description: body.description || '',
-            categoryId: body.category,
-            variations: [{
-              type: 'ITEM_VARIATION',
-              id: (body.variations?.[0]?.id || body.id) + '_variation',
-              itemVariationData: {
-                name: 'Regular',
-                sku: body.sku,
-                priceMoney: {
-                  amount: BigInt(Math.round(body.price * 100)),
-                  currency: 'USD'
-                }
-              }
-            }]
-          }
-        }]
-      }]
-    })
-
-    if (!result.objects?.[0]) {
-      throw new Error('Failed to update catalog item')
-    }
-
-    // Clear cache after update
-    cache = null
-
-    return NextResponse.json({
-      success: true,
-      data: result.objects[0]
-    })
-
-  } catch (error: any) {
-    console.error('Catalog API error:', error)
-    Sentry.captureException(error, {
-      extra: { context: 'catalog_api_route' }
-    })
-
-    return NextResponse.json({ 
-      success: false,
-      error: {
-        code: 'UNHANDLED_ERROR',
-        message: error.message || 'An unexpected error occurred'
       }
     }, { status: 500 })
   }

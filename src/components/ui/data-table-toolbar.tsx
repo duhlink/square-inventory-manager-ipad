@@ -9,24 +9,12 @@ import { DataTableCategories } from "@/components/ui/data-table-categories"
 
 interface DataTableToolbarProps<TData> {
   table: Table<TData>
-  filterableColumns?: {
-    id: string
-    title: string
-    options: {
-      label: string
-      value: string
-    }[]
-  }[]
 }
 
 export function DataTableToolbar<TData>({
   table,
-  filterableColumns = [],
 }: DataTableToolbarProps<TData>) {
   const isFiltered = table.getState().columnFilters.length > 0
-
-  // Find categories from filterableColumns
-  const categoriesFilter = filterableColumns.find(col => col.id === "categories")
 
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-2">
@@ -39,11 +27,8 @@ export function DataTableToolbar<TData>({
           }
           className="h-8 w-full sm:w-[150px] lg:w-[250px]"
         />
-        {categoriesFilter && (
-          <DataTableCategories 
-            table={table}
-            categories={categoriesFilter.options}
-          />
+        {table.getColumn("categories") && (
+          <DataTableCategories table={table} />
         )}
         {isFiltered && (
           <Button
