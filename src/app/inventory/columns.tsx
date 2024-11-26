@@ -22,13 +22,13 @@ export const columns: ColumnDef<InventoryItem>[] = [
       <DataTableColumnHeader 
         column={column} 
         title="Image"
-        className="w-[50px]"
+        className="w-[40px]"
       />
     ),
     cell: ({ row }) => {
       const imageUrl = row.original.imageUrl
       return imageUrl ? (
-        <div className="w-[50px] h-[50px] relative">
+        <div className="w-[40px] h-[40px] relative">
           <img
             src={imageUrl}
             alt={row.getValue("name")}
@@ -36,7 +36,7 @@ export const columns: ColumnDef<InventoryItem>[] = [
           />
         </div>
       ) : (
-        <div className="w-[50px] h-[50px] bg-muted rounded-sm" />
+        <div className="w-[40px] h-[40px] bg-muted rounded-sm" />
       )
     },
     enableSorting: false,
@@ -48,31 +48,41 @@ export const columns: ColumnDef<InventoryItem>[] = [
       <DataTableColumnHeader 
         column={column} 
         title="Name"
-        className="min-w-[80px] sm:min-w-[120px]"
+        className="min-w-[100px]"
       />
     ),
     cell: ({ row }) => (
-      <div className="max-w-[120px] sm:max-w-[200px] font-medium">
-        <span className="truncate block">{row.getValue("name")}</span>
+      <div className="max-w-[180px] truncate font-medium">
+        {row.getValue("name")}
       </div>
     ),
     enableSorting: true,
   },
   {
-    id: "sku",
-    accessorKey: "sku",
+    id: "variations",
+    accessorKey: "variations",
     header: ({ column }) => (
       <DataTableColumnHeader 
         column={column} 
-        title="SKU"
+        title="Variations"
       />
     ),
-    cell: ({ row }) => (
-      <div className="font-mono text-sm">
-        {row.getValue("sku") || "N/A"}
-      </div>
-    ),
-    enableSorting: true,
+    cell: ({ row }) => {
+      const variations = (row.getValue("variations") as InventoryItem["variations"]) || []
+      if (!variations.length) return null
+      return (
+        <div className="flex flex-col gap-1 max-w-[120px]">
+          {variations.map((v, i) => (
+            <div key={i} className="text-xs">
+              <div className="font-medium truncate">{v.name}</div>
+              <div className="text-muted-foreground truncate">
+                SKU: {v.sku || "N/A"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    },
   },
   {
     accessorKey: "categories",
@@ -130,19 +140,19 @@ export const columns: ColumnDef<InventoryItem>[] = [
       <DataTableColumnHeader 
         column={column} 
         title="Qty"
-        className="w-[60px] sm:w-auto"
+        className="w-[60px]"
       />
     ),
     cell: ({ row }) => {
       const quantity = row.getValue("quantity") as number
       const reorderPoint = row.original.reorderPoint
       return (
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1">
           <span>{quantity}</span>
           {quantity <= reorderPoint && (
             <Badge 
               variant={quantity === 0 ? "destructive" : "warning"}
-              className="text-[10px] sm:text-xs px-1"
+              className="text-[10px] px-1"
             >
               {quantity === 0 ? "Out" : "Low"}
             </Badge>
@@ -159,11 +169,11 @@ export const columns: ColumnDef<InventoryItem>[] = [
       <DataTableColumnHeader 
         column={column} 
         title="Unit"
-        className="hidden sm:table-cell"
+        className="w-[80px]"
       />
     ),
     cell: ({ row }) => (
-      <span className="hidden sm:table-cell">
+      <span className="truncate">
         {row.getValue("unitType") || "per item"}
       </span>
     ),
@@ -176,7 +186,7 @@ export const columns: ColumnDef<InventoryItem>[] = [
       <DataTableColumnHeader 
         column={column} 
         title="Price"
-        className="w-[70px] sm:w-auto"
+        className="w-[80px]"
       />
     ),
     cell: ({ row }) => {
@@ -195,19 +205,15 @@ export const columns: ColumnDef<InventoryItem>[] = [
       <DataTableColumnHeader 
         column={column} 
         title="Unit Cost"
-        className="hidden lg:table-cell"
+        className="w-[80px]"
       />
     ),
     cell: ({ row }) => {
       const unitCost = row.getValue("unitCost") as number
-      return (
-        <span className="hidden lg:table-cell">
-          {new Intl.NumberFormat("en-US", {
-            style: "currency",
-            currency: "USD",
-          }).format(unitCost || 0)}
-        </span>
-      )
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(unitCost || 0)
     },
     enableSorting: true,
   },
@@ -221,38 +227,11 @@ export const columns: ColumnDef<InventoryItem>[] = [
       />
     ),
     cell: ({ row }) => (
-      <div className="max-w-[150px]">
+      <div className="max-w-[120px]">
         <span className="truncate block">{row.getValue("vendorName") || "No Vendor"}</span>
       </div>
     ),
     enableSorting: true,
-  },
-  {
-    id: "variations",
-    accessorKey: "variations",
-    header: ({ column }) => (
-      <DataTableColumnHeader 
-        column={column} 
-        title="Variations"
-        className="hidden xl:table-cell"
-      />
-    ),
-    cell: ({ row }) => {
-      const variations = (row.getValue("variations") as InventoryItem["variations"]) || []
-      if (!variations.length) return null
-      return (
-        <div className="hidden xl:flex flex-col gap-1">
-          {variations.map((v, i) => (
-            <div key={i} className="text-xs">
-              <div className="font-medium">{v.name}</div>
-              <div className="text-muted-foreground">
-                SKU: {v.sku || "N/A"}
-              </div>
-            </div>
-          ))}
-        </div>
-      )
-    },
   },
   {
     id: "actions",

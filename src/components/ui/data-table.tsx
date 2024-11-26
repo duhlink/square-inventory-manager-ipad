@@ -27,6 +27,7 @@ import {
 
 import { DataTablePagination } from "@/components/ui/data-table-pagination"
 import { DataTableToolbar } from "@/components/ui/data-table-toolbar"
+import { LoadingSpinner, StatusMessage } from "@/components/ui/loading-state"
 
 interface DataTableProps<TData> {
   columns: ColumnDef<TData, any>[]
@@ -50,6 +51,11 @@ export function DataTable<TData>({
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [sorting, setSorting] = React.useState<SortingState>([])
+  const [isFiltering, setIsFiltering] = React.useState(false)
+  const [status, setStatus] = React.useState<{
+    message: string;
+    type: "info" | "success" | "warning" | "error";
+  } | null>(null)
 
   const table = useReactTable({
     data,
@@ -63,7 +69,19 @@ export function DataTable<TData>({
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    onColumnFiltersChange: (value) => {
+      setIsFiltering(true)
+      setColumnFilters(value)
+      // Simulate loading state for filtering
+      setTimeout(() => {
+        setIsFiltering(false)
+        setStatus({ 
+          message: "Filter applied", 
+          type: "success" 
+        })
+        setTimeout(() => setStatus(null), 2000)
+      }, 500)
+    },
     onColumnVisibilityChange: setColumnVisibility,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -74,71 +92,92 @@ export function DataTable<TData>({
   })
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="h-full flex flex-col">
       <div className="flex-none">
         <DataTableToolbar 
           table={table}
           filterableColumns={filterableColumns}
+          isFiltering={isFiltering}
         />
       </div>
-      <div className="flex-1 min-h-0 rounded-md border">
+      {status && (
+        <div className="flex-none mt-2">
+          <StatusMessage 
+            message={status.message} 
+            type={status.type} 
+          />
+        </div>
+      )}
+      <div className="flex-1 min-h-0 mt-2 border rounded-md">
         <div className="h-full overflow-auto">
-          <div className="min-w-[1000px]"> {/* Added minimum width container */}
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => {
-                      const isSortable = header.column.getCanSort()
-                      const sortHandler = header.column.getToggleSortingHandler()
-                      return (
-                        <TableHead 
-                          key={header.id}
-                          isSortable={isSortable}
-                          onSort={sortHandler ? () => sortHandler({}) : undefined}
-                        >
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                        </TableHead>
-                      )
-                    })}
+          <Table>
+            <TableHeader className="sticky top-0 bg-background z-10">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    const isSortable = header.column.getCanSort()
+                    const sortHandler = header.column.getToggleSortingHandler()
+                    return (
+                      <TableHead 
+                        key={header.id}
+                        isSortable={isSortable}
+                        onSort={sortHandler ? () => sortHandler({}) : undefined}
+                      >
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    )
+                  })}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {isFiltering ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
+                  >
+                    <div className="flex items-center justify-center gap-2">
+                      <LoadingSpinner size="sm" />
+                      <span className="text-sm text-muted-foreground">
+                        Filtering results...
+                      </span>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
                   </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center"
-                    >
-                      No results.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
+                  >
+                    No results.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
       </div>
       <div className="flex-none mt-2">

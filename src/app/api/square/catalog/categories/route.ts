@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { squareClient } from '@/services/square/config'
 import * as Sentry from '@sentry/nextjs'
+import { CatalogObject } from 'square'
 
 export async function GET() {
   try {
@@ -9,13 +10,27 @@ export async function GET() {
     }
 
     console.log('Fetching catalog categories...')
-    // Fetch all catalog objects of type CATEGORY
-    const { result } = await squareClient.catalogApi.listCatalog(
-      undefined,
-      'CATEGORY'
-    )
+    
+    // Fetch all categories using pagination
+    let allObjects: CatalogObject[] = []
+    let cursor: string | undefined
+    
+    do {
+      const { result } = await squareClient.catalogApi.listCatalog(
+        cursor,
+        'CATEGORY'
+      )
+      
+      if (result.objects) {
+        allObjects = [...allObjects, ...result.objects]
+      }
+      
+      cursor = result.cursor
+    } while (cursor)
 
-    if (!result.objects) {
+    console.log(`Fetched ${allObjects.length} total categories`)
+
+    if (!allObjects.length) {
       return NextResponse.json({
         success: true,
         data: []
@@ -23,7 +38,7 @@ export async function GET() {
     }
 
     // Map categories to the format needed by the data table
-    const categories = result.objects
+    const categories = allObjects
       .filter(obj => obj.type === 'CATEGORY' && !obj.isDeleted && obj.categoryData?.name)
       .map(obj => ({
         label: obj.categoryData!.name!,

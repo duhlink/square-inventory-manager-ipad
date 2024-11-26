@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
 import { squareClient } from '@/services/square/config'
-import { getVendorName } from '@/services/square/vendors'
+import { getVendorNames } from '@/services/square/vendors'
 import { collectObjectIds, getCategoryNames, getMeasurementUnitNames, getImageUrls } from '@/services/square/catalog'
 import * as Sentry from '@sentry/nextjs'
 import { CatalogObject, Money } from 'square'
 
-// Use type assertion instead of interface extension
 type ExtendedCatalogItemVariation = CatalogObject & {
   itemVariationData?: {
     itemId?: string
@@ -37,113 +36,146 @@ export async function GET() {
     }
 
     console.log('Fetching catalog items...')
-    const { result } = await squareClient.catalogApi.listCatalog(
-      undefined,
-      'ITEM'
-    )
+    
+    // Fetch all items using pagination
+    let allObjects: CatalogObject[] = []
+    let cursor: string | undefined
+    
+    do {
+      const { result } = await squareClient.catalogApi.listCatalog(
+        cursor,
+        'ITEM'
+      )
+      
+      if (result.objects) {
+        allObjects = [...allObjects, ...result.objects]
+      }
+      
+      cursor = result.cursor
+    } while (cursor)
 
-    if (!result.objects) {
-      return NextResponse.json({
-        success: true,
-        data: []
-      })
-    }
+    console.log(`Fetched ${allObjects.length} total items`)
 
     // Get all active items
-    const activeItems = result.objects.filter(item => item.type === 'ITEM' && !item.isDeleted)
+    const activeItems = allObjects.filter(item => item.type === 'ITEM' && !item.isDeleted)
 
     // Collect all object IDs that need to be fetched
     const { categoryIds, measurementUnitIds, imageIds } = collectObjectIds(activeItems)
 
+    // Collect all vendor IDs from variations
+    const vendorIds = new Set<string>()
+    activeItems.forEach(item => {
+      const variations = item.itemData?.variations || []
+      variations.forEach(variation => {
+        const vendorInfos = (variation as ExtendedCatalogItemVariation).itemVariationData?.itemVariationVendorInfos || []
+        vendorInfos.forEach(info => {
+          const vendorId = info.itemVariationVendorInfoData?.vendorId
+          if (vendorId) {
+            vendorIds.add(vendorId)
+          }
+        })
+      })
+    })
+
+    console.log('Found vendor IDs:', Array.from(vendorIds))
+
     // Batch fetch all needed data
-    const [categoryNames, unitMap, imageMap] = await Promise.all([
+    const [categoryNames, unitMap, imageMap, vendorMap] = await Promise.all([
       getCategoryNames(categoryIds),
       getMeasurementUnitNames(measurementUnitIds),
-      getImageUrls(imageIds)
+      getImageUrls(imageIds),
+      getVendorNames(Array.from(vendorIds))
     ])
 
     // Map items with resolved data
-    const items = await Promise.all(
-      activeItems.map(async item => {
-        // Get vendor info from first variation if available
-        const firstVariation = item.itemData?.variations?.[0] as ExtendedCatalogItemVariation
-        const vendorInfo = firstVariation?.itemVariationData?.itemVariationVendorInfos?.[0]
-        const vendorId = vendorInfo?.itemVariationVendorInfoData?.vendorId || 'WBEGKGP7O4ZWECWE'
-        
-        // Get vendor name using our vendor service
-        const vendorName = await getVendorName(vendorId)
+    const items = activeItems.map(item => {
+      // Get vendor info from variations
+      const variations = item.itemData?.variations || []
+      let vendorId: string | undefined
+      let vendorName: string | undefined
 
-        // Get measurement unit name if available
-        const measurementUnitId = firstVariation?.itemVariationData?.measurementUnitId
-        const unitType = measurementUnitId 
+      // Look through variations for vendor info
+      for (const variation of variations) {
+        const vendorInfos = (variation as ExtendedCatalogItemVariation).itemVariationData?.itemVariationVendorInfos || []
+        for (const info of vendorInfos) {
+          if (info.itemVariationVendorInfoData?.vendorId) {
+            vendorId = info.itemVariationVendorInfoData.vendorId
+            vendorName = vendorMap.get(vendorId)
+            if (vendorName) break
+          }
+        }
+        if (vendorName) break
+      }
+
+      // Get measurement unit name if available
+      const firstVariation = variations[0] as ExtendedCatalogItemVariation
+      const measurementUnitId = firstVariation?.itemVariationData?.measurementUnitId
+      const unitType = measurementUnitId 
+        ? unitMap.get(measurementUnitId) || 'per item'
+        : 'per item'
+
+      // Get category names
+      const itemCategoryIds = (item.itemData?.categories || []).map(c => c.id).filter((id): id is string => !!id)
+      const categories = itemCategoryIds.map((id, index) => categoryNames[index] || 'Unknown Category')
+
+      // Get image URL if available
+      const imageId = item.itemData?.imageIds?.[0]
+      const imageUrl = imageId ? imageMap.get(imageId) : undefined
+
+      // Map variations
+      const mappedVariations = variations.map(variation => {
+        const extendedVariation = variation as ExtendedCatalogItemVariation
+        const vendorInfo = extendedVariation.itemVariationData?.itemVariationVendorInfos?.[0]
+        const measurementUnitId = extendedVariation.itemVariationData?.measurementUnitId
+        const unitName = measurementUnitId 
           ? unitMap.get(measurementUnitId) || 'per item'
           : 'per item'
-
-        // Get category names
-        const itemCategoryIds = (item.itemData?.categories || []).map(c => c.id).filter((id): id is string => !!id)
-        const categories = itemCategoryIds.map((id, index) => categoryNames[index] || 'Unknown Category')
-
-        // Get image URL if available
-        const imageId = item.itemData?.imageIds?.[0]
-        const imageUrl = imageId ? imageMap.get(imageId) : undefined
-
-        // Map variations
-        const variations = await Promise.all((item.itemData?.variations || []).map(async variation => {
-          const extendedVariation = variation as ExtendedCatalogItemVariation
-          const vendorInfo = extendedVariation.itemVariationData?.itemVariationVendorInfos?.[0]
-          const measurementUnitId = extendedVariation.itemVariationData?.measurementUnitId
-          const unitName = measurementUnitId 
-            ? unitMap.get(measurementUnitId) || 'per item'
-            : 'per item'
-          
-          return {
-            id: variation.id,
-            name: extendedVariation.itemVariationData?.name || '',
-            sku: extendedVariation.itemVariationData?.sku || '',
-            price: extendedVariation.itemVariationData?.priceMoney?.amount 
-              ? Number(extendedVariation.itemVariationData.priceMoney.amount) / 100 
-              : 0,
-            cost: vendorInfo?.itemVariationVendorInfoData?.priceMoney?.amount
-              ? Number(vendorInfo.itemVariationVendorInfoData.priceMoney.amount) / 100
-              : 0,
-            measurementUnit: unitName,
-            vendorSku: vendorInfo?.itemVariationVendorInfoData?.sku
-          }
-        }))
-
-        // Map to our InventoryItem format
-        const mappedItem = {
-          id: item.id,
-          name: item.itemData?.name || '',
-          description: item.itemData?.description || '',
-          sku: variations[0]?.sku || '',
-          categories,
-          categoryIds: itemCategoryIds,
-          price: variations[0]?.price || 0,
-          unitCost: variations[0]?.cost || 0,
-          quantity: 0, // We'll handle inventory separately
-          reorderPoint: 5,
-          vendorId,
-          vendorName,
-          vendorCode: vendorId,
-          unitType,
-          measurementUnitId: measurementUnitId || '',
-          lastUpdated: item.updatedAt || new Date().toISOString(),
-          updatedBy: 'system',
-          squareId: item.id,
-          squareCatalogVersion: Number(item.version || 0),
-          squareUpdatedAt: item.updatedAt || '',
-          variations,
-          isTaxable: item.itemData?.isTaxable || false,
-          visibility: item.itemData?.availableOnline ? 'PUBLIC' : 'PRIVATE',
-          trackInventory: variations[0]?.measurementUnit ? true : false,
-          imageUrl,
-          imageId
+        
+        return {
+          id: variation.id,
+          name: extendedVariation.itemVariationData?.name || '',
+          sku: extendedVariation.itemVariationData?.sku || '',
+          price: extendedVariation.itemVariationData?.priceMoney?.amount 
+            ? Number(extendedVariation.itemVariationData.priceMoney.amount) / 100 
+            : 0,
+          cost: vendorInfo?.itemVariationVendorInfoData?.priceMoney?.amount
+            ? Number(vendorInfo.itemVariationVendorInfoData.priceMoney.amount) / 100
+            : 0,
+          measurementUnit: unitName,
+          vendorSku: vendorInfo?.itemVariationVendorInfoData?.sku
         }
-
-        return mappedItem
       })
-    )
+
+      // Map to our InventoryItem format
+      return {
+        id: item.id,
+        name: item.itemData?.name || '',
+        description: item.itemData?.description || '',
+        sku: mappedVariations[0]?.sku || '',
+        categories,
+        categoryIds: itemCategoryIds,
+        price: mappedVariations[0]?.price || 0,
+        unitCost: mappedVariations[0]?.cost || 0,
+        quantity: 0, // We'll handle inventory separately
+        reorderPoint: 5,
+        vendorId: vendorId || '',
+        vendorName: vendorName || '',
+        vendorCode: vendorId || '',
+        unitType,
+        measurementUnitId: measurementUnitId || '',
+        lastUpdated: item.updatedAt || new Date().toISOString(),
+        updatedBy: 'system',
+        squareId: item.id,
+        squareCatalogVersion: Number(item.version || 0),
+        squareUpdatedAt: item.updatedAt || '',
+        variations: mappedVariations,
+        isTaxable: item.itemData?.isTaxable || false,
+        visibility: item.itemData?.availableOnline ? 'PUBLIC' : 'PRIVATE',
+        trackInventory: mappedVariations[0]?.measurementUnit ? true : false,
+        imageUrl,
+        imageId
+      }
+    })
 
     return NextResponse.json({
       success: true,
