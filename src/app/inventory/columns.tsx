@@ -15,6 +15,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DataTableColumnHeader } from "@/components/ui/data-table-column-header"
 
+const formatUnit = (unit: string): string => {
+  const unitLower = unit.toLowerCase()
+  if (unitLower.includes('gallon')) return 'gallon'
+  if (unitLower.includes('foot') || unitLower.includes('feet')) return 'foot'
+  return unit
+}
+
+const formatCategoryCount = (count: number): string => {
+  if (count <= 0) return '   '  // 3 spaces for no additional categories
+  if (count < 10) return ` +${count}`  // space pad single digit
+  return `+${count}`  // no padding needed for double digits
+}
+
 export const columns: ColumnDef<InventoryItem>[] = [
   {
     id: "image",
@@ -90,6 +103,7 @@ export const columns: ColumnDef<InventoryItem>[] = [
       <DataTableColumnHeader 
         column={column} 
         title="Categories"
+        className="w-[180px]"
       />
     ),
     cell: ({ row }) => {
@@ -97,38 +111,42 @@ export const columns: ColumnDef<InventoryItem>[] = [
       if (!categories.length) return <span className="text-muted-foreground text-sm">No categories</span>
 
       return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
-              className="h-8 flex items-center gap-1 hover:bg-accent hover:text-accent-foreground"
-            >
-              <Badge variant="outline" className="text-xs">
-                {categories[0]}
-              </Badge>
-              {categories.length > 1 && (
-                <Badge variant="secondary" className="text-xs">
-                  +{categories.length - 1}
-                </Badge>
-              )}
-              <ChevronDown className="h-4 w-4 opacity-50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[200px]">
-            <DropdownMenuLabel>Categories</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {categories.map((category, index) => (
-              <DropdownMenuItem key={index} className="text-sm">
-                {category}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="w-[180px]">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="h-8 w-[180px] justify-start px-2.5 font-normal hover:bg-accent hover:text-accent-foreground group"
+              >
+                <div className="flex items-center w-full">
+                  <div className="border rounded px-2 py-0.5 flex-1 truncate min-w-0 text-xs mr-2">
+                    {categories[0]}
+                  </div>
+                  <div className="flex items-center flex-none font-mono text-xs">
+                    <ChevronDown className="h-3.5 w-3.5 opacity-50 group-hover:opacity-70 mr-1" />
+                    <span className="text-muted-foreground w-[24px] text-right">
+                      {formatCategoryCount(categories.length - 1)}
+                    </span>
+                  </div>
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[180px]">
+              <DropdownMenuLabel>Categories</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {categories.map((category, index) => (
+                <DropdownMenuItem key={index} className="text-sm">
+                  {category}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       )
     },
     filterFn: (row, id, value: string[]) => {
       const categoryIds = row.original.categoryIds as string[]
-      if (!value?.length) return true // Show all when no filter is applied
+      if (!value?.length) return true
       return value.some(val => categoryIds?.includes(val))
     },
     enableSorting: true,
@@ -172,11 +190,14 @@ export const columns: ColumnDef<InventoryItem>[] = [
         className="w-[80px]"
       />
     ),
-    cell: ({ row }) => (
-      <span className="truncate">
-        {row.getValue("unitType") || "per item"}
-      </span>
-    ),
+    cell: ({ row }) => {
+      const unit = row.getValue("unitType") as string
+      return (
+        <span className="truncate">
+          {unit ? formatUnit(unit) : "per item"}
+        </span>
+      )
+    },
     enableSorting: true,
   },
   {
@@ -249,7 +270,7 @@ export const columns: ColumnDef<InventoryItem>[] = [
           <DropdownMenuTrigger asChild>
             <Button 
               variant="ghost" 
-              className="h-8 w-8 p-0"
+              className="h-7 w-7 p-0"
             >
               <span className="sr-only">Open menu</span>
               <MoreHorizontal className="h-4 w-4" />
@@ -261,14 +282,14 @@ export const columns: ColumnDef<InventoryItem>[] = [
           >
             <DropdownMenuLabel>Actions</DropdownMenuLabel>
             <DropdownMenuItem
-              className="h-9"
+              className="h-8"
               onClick={() => navigator.clipboard.writeText(item.id)}
             >
               Copy Item ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem 
-              className="h-9"
+              className="h-8"
               onSelect={() => {
                 const content = document.querySelector('[role="dialog"]')?.parentElement
                 if (content) content.style.pointerEvents = "auto"
@@ -277,15 +298,15 @@ export const columns: ColumnDef<InventoryItem>[] = [
             >
               Edit Item
             </DropdownMenuItem>
-            <DropdownMenuItem className="h-9">
+            <DropdownMenuItem className="h-8">
               View History
             </DropdownMenuItem>
-            <DropdownMenuItem className="h-9">
+            <DropdownMenuItem className="h-8">
               Add to Purchase Order
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="text-destructive focus:bg-destructive focus:text-destructive-foreground h-9"
+              className="text-destructive focus:bg-destructive focus:text-destructive-foreground h-8"
               onSelect={() => {
                 const content = document.querySelector('[role="dialog"]')?.parentElement
                 if (content) content.style.pointerEvents = "auto"
