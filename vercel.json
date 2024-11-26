@@ -1,39 +1,5 @@
 {
-  "framework": "nextjs",
   "buildCommand": "next build",
-  "installCommand": "npm install",
-  "routes": [
-    {
-      "src": "/catalog",
-      "dest": "src/app/catalog/page"
-    },
-    {
-      "src": "/api/square/catalog",
-      "dest": "src/app/api/square/catalog/route"
-    },
-    {
-      "src": "/api/square/catalog/categories",
-      "dest": "src/app/api/square/catalog/categories/route"
-    },
-    {
-      "src": "/api/square/catalog/vendors",
-      "dest": "src/app/api/square/catalog/vendors/route"
-    },
-    {
-      "src": "/api/square/inventory",
-      "dest": "src/app/api/square/inventory/route"
-    },
-    {
-      "src": "/api/square/inventory/counts",
-      "dest": "src/app/api/square/inventory/counts/route"
-    },
-    {
-      "src": "/api/square/vendors",
-      "dest": "src/app/api/square/vendors/route"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "src/app/$1"
-    }
-  ]
+  "devCommand": "next dev",
+  "framework": "nextjs"
 }
