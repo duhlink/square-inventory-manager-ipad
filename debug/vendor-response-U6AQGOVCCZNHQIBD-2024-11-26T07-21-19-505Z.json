@@ -1,0 +1,17 @@
+{
+  "vendor_id": "U6AQGOVCCZNHQIBD",
+  "response": {
+    "vendor": {
+      "id": "U6AQGOVCCZNHQIBD",
+      "created_at": "2023-11-15T01:24:53.269Z",
+      "updated_at": "2023-11-15T01:24:53.269Z",
+      "name": "Meeder Ransom",
+      "address": {
+        "country": "US"
+      },
+      "version": 1,
+      "status": "ACTIVE"
+    }
+  },
+  "timestamp": "2024-11-26T07:21:19.505Z"
+}

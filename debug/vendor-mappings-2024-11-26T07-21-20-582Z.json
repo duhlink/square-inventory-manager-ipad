@@ -1,0 +1,46 @@
+{
+  "total_requested": 10,
+  "total_retrieved": 10,
+  "vendor_mappings": [
+    {
+      "id": "57JKL7IHUI73VSU4",
+      "name": "New Flame Propane"
+    },
+    {
+      "id": "JTYAV7XKZUT3VZ37",
+      "name": "Worthington"
+    },
+    {
+      "id": "6LMW4KIIXHIMC7W7",
+      "name": "New Flame Firewood"
+    },
+    {
+      "id": "U6AQGOVCCZNHQIBD",
+      "name": "Meeder Ransom"
+    },
+    {
+      "id": "7ICMMTGL3KN64UFH",
+      "name": "FEI Inc"
+    },
+    {
+      "id": "ZCM653GICPPVKIL6",
+      "name": "QUALITY STEEL CORP"
+    },
+    {
+      "id": "WBEGKGP7O4ZWECWE",
+      "name": "Flame King"
+    },
+    {
+      "id": "FUZ43DCXLYD32KDU",
+      "name": "Amazon"
+    },
+    {
+      "id": "W2TYJXEICYUQKGUK",
+      "name": "Home Depot"
+    },
+    {
+      "id": "SCNBMNX6YKC4KPOG",
+      "name": "Honeywell"
+    }
+  ]
+}

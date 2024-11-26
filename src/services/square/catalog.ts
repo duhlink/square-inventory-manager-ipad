@@ -93,6 +93,7 @@ export function collectObjectIds(items: any[]) {
   const categoryIds = new Set<string>()
   const measurementUnitIds = new Set<string>()
   const imageIds = new Set<string>()
+  const vendorIds = new Set<string>()
 
   items.forEach(item => {
     // Collect category IDs
@@ -100,11 +101,20 @@ export function collectObjectIds(items: any[]) {
       if (cat.id) categoryIds.add(cat.id)
     })
 
-    // Collect measurement unit IDs
+    // Collect measurement unit IDs and vendor IDs
     item.itemData?.variations?.forEach((variation: any) => {
       if (variation.itemVariationData?.measurementUnitId) {
         measurementUnitIds.add(variation.itemVariationData.measurementUnitId)
       }
+
+      // Extract vendor IDs from item_variation_vendor_infos
+      const vendorInfos = variation.itemVariationData?.item_variation_vendor_infos || []
+      vendorInfos.forEach((info: any) => {
+        if (info.item_variation_vendor_info_data?.vendor_id) {
+          vendorIds.add(info.item_variation_vendor_info_data.vendor_id)
+          console.log('Found vendor ID in collectObjectIds:', info.item_variation_vendor_info_data.vendor_id)
+        }
+      })
     })
 
     // Collect image IDs
@@ -116,6 +126,7 @@ export function collectObjectIds(items: any[]) {
   return {
     categoryIds: Array.from(categoryIds),
     measurementUnitIds: Array.from(measurementUnitIds),
-    imageIds: Array.from(imageIds)
+    imageIds: Array.from(imageIds),
+    vendorIds: Array.from(vendorIds)
   }
 }

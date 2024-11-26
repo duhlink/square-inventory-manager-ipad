@@ -1,0 +1,17 @@
+{
+  "vendor_id": "FUZ43DCXLYD32KDU",
+  "response": {
+    "vendor": {
+      "id": "FUZ43DCXLYD32KDU",
+      "created_at": "2023-11-14T21:58:25.897Z",
+      "updated_at": "2023-11-14T21:58:25.897Z",
+      "name": "Amazon",
+      "address": {
+        "country": "US"
+      },
+      "version": 1,
+      "status": "ACTIVE"
+    }
+  },
+  "timestamp": "2024-11-26T07:21:31.789Z"
+}

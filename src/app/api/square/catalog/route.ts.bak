@@ -1,0 +1,358 @@
+import { NextResponse } from 'next/server'
+import { squareClient } from '@/services/square/config'
+import { getVendorNames } from '@/services/square/vendors'
+import { collectObjectIds, getCategoryNames, getMeasurementUnitNames, getImageUrls } from '@/services/square/catalog'
+import * as Sentry from '@sentry/nextjs'
+import { CatalogObject, Money, InventoryCount } from 'square'
+
+// Helper function to recursively convert BigInt to regular numbers
+const convertBigIntToNumber = (obj: any): any => {
+  if (obj === null || obj === undefined) {
+    return obj
+  }
+
+  if (typeof obj === 'bigint') {
+    return Number(obj.toString())
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => convertBigIntToNumber(item))
+  }
+
+  if (typeof obj === 'object') {
+    const converted: any = {}
+    for (const key in obj) {
+      converted[key] = convertBigIntToNumber(obj[key])
+    }
+    return converted
+  }
+
+  return obj
+}
+
+// Helper function to safely handle money amounts
+const safeMoneyToNumber = (money: Money | undefined | null): number => {
+  if (!money || !money.amount) return 0
+  return Number(money.amount.toString()) / 100
+}
+
+interface ItemVariationVendorInfo {
+  type: string
+  id: string
+  updated_at: string
+  created_at: string
+  version: number
+  is_deleted: boolean
+  present_at_all_locations: boolean
+  present_at_location_ids: string[]
+  item_variation_vendor_info_data: {
+    ordinal: number
+    sku: string
+    item_variation_id: string
+    vendor_id: string
+    cost_money?: Money
+  }
+}
+
+type ExtendedCatalogItemVariation = CatalogObject & {
+  itemVariationData?: {
+    itemId?: string
+    name?: string
+    sku?: string
+    ordinal?: number
+    pricingType?: string
+    priceMoney?: Money
+    locationOverrides?: Array<{
+      locationId: string
+      trackInventory?: boolean
+      soldOut?: boolean
+    }>
+    measurementUnitId?: string
+    stockable?: boolean
+    inventoryAlertType?: string
+    inventoryAlertThreshold?: number
+    item_variation_vendor_infos?: ItemVariationVendorInfo[]
+    item_variation_vendor_info_ids?: string[]
+  }
+}
+
+// Helper function to extract vendor ID from variation
+const extractVendorId = (variation: CatalogObject, vendorInfoMap: Map<string, ItemVariationVendorInfo>): string | undefined => {
+  try {
+    const extendedVariation = variation as ExtendedCatalogItemVariation
+    
+    // Try to get vendor info from vendor info IDs
+    const vendorInfoIds = extendedVariation.itemVariationData?.item_variation_vendor_info_ids
+    if (vendorInfoIds && vendorInfoIds.length > 0) {
+      const vendorInfo = vendorInfoMap.get(vendorInfoIds[0])
+      if (vendorInfo?.item_variation_vendor_info_data?.vendor_id) {
+        console.log(`Found vendor ID ${vendorInfo.item_variation_vendor_info_data.vendor_id} for variation ${variation.id}`)
+        return vendorInfo.item_variation_vendor_info_data.vendor_id
+      }
+    }
+
+    // Try to get vendor info from custom attributes
+    const customAttributes = variation.customAttributeValues || {}
+    if (customAttributes.vendor_id?.stringValue) {
+      return customAttributes.vendor_id.stringValue
+    }
+
+    return undefined
+  } catch (error) {
+    console.error('Error extracting vendor ID:', error)
+    return undefined
+  }
+}
+
+// Helper function to safely log objects that might contain BigInt
+const safeLog = (message: string, obj: any) => {
+  try {
+    console.log(message, JSON.stringify(convertBigIntToNumber(obj), null, 2))
+  } catch (error) {
+    console.log(message, 'Error stringifying object:', error)
+  }
+}
+
+export async function GET() {
+  try {
+    if (!squareClient?.catalogApi) {
+      throw new Error('Square catalog API is not properly initialized')
+    }
+
+    console.log('Fetching catalog items...')
+    
+    // Fetch all items using pagination
+    let allObjects: CatalogObject[] = []
+    let cursor: string | undefined
+    
+    do {
+      const { result } = await squareClient.catalogApi.listCatalog(
+        cursor,
+        'ITEM,ITEM_VARIATION,ITEM_VARIATION_VENDOR_INFO'
+      )
+      
+      if (result.objects) {
+        // Log the raw response to see the vendor info structure
+        safeLog('Raw catalog response sample:', result.objects[0])
+        // Convert BigInt values immediately after receiving the data
+        const convertedObjects = convertBigIntToNumber(result.objects)
+        allObjects = [...allObjects, ...convertedObjects]
+      }
+      
+      cursor = result.cursor
+    } while (cursor)
+
+    console.log(`Fetched ${allObjects.length} total items`)
+
+    // Create a map of vendor info objects
+    const vendorInfoMap = new Map<string, ItemVariationVendorInfo>()
+    allObjects
+      .filter(obj => obj.type === 'ITEM_VARIATION_VENDOR_INFO' && !obj.isDeleted)
+      .forEach(obj => {
+        vendorInfoMap.set(obj.id, obj as unknown as ItemVariationVendorInfo)
+      })
+
+    console.log(`Found ${vendorInfoMap.size} vendor info objects`)
+
+    // Get all active items and variations
+    const activeItems = allObjects.filter(item => item.type === 'ITEM' && !item.isDeleted)
+    const itemVariations = allObjects.filter(obj => obj.type === 'ITEM_VARIATION' && !obj.isDeleted)
+
+    console.log(`Found ${activeItems.length} active items and ${itemVariations.length} variations`)
+
+    // Create a map of variation IDs to their vendor IDs
+    const variationVendorMap = new Map<string, string>()
+    itemVariations.forEach(variation => {
+      const vendorId = extractVendorId(variation, vendorInfoMap)
+      if (vendorId) {
+        console.log(`Found vendor ID ${vendorId} for variation ${variation.id}`)
+        variationVendorMap.set(variation.id, vendorId)
+      }
+    })
+
+    safeLog('Variation to Vendor mapping:', Object.fromEntries(variationVendorMap))
+
+    // Collect all vendor IDs
+    const vendorIds = new Set<string>(Array.from(variationVendorMap.values()))
+    console.log('Collected vendor IDs:', Array.from(vendorIds))
+
+    // Collect all object IDs that need to be fetched
+    const { categoryIds, measurementUnitIds, imageIds } = collectObjectIds(activeItems)
+
+    // Batch fetch all needed data
+    const [categoryNames, unitMap, imageMap, vendorMap] = await Promise.all([
+      getCategoryNames(categoryIds),
+      getMeasurementUnitNames(measurementUnitIds),
+      getImageUrls(imageIds),
+      getVendorNames(Array.from(vendorIds))
+    ])
+
+    safeLog('Vendor name mapping:', Object.fromEntries(vendorMap))
+
+    // Fetch inventory counts if available
+    let inventoryCounts: Map<string, number> = new Map()
+    try {
+      const { result } = await squareClient.inventoryApi.batchRetrieveInventoryCounts({
+        catalogObjectIds: activeItems.flatMap(item => 
+          (item.itemData?.variations || []).map(v => v.id)
+        ).filter((id): id is string => !!id)
+      })
+      
+      // Convert inventory counts immediately
+      const convertedCounts = convertBigIntToNumber(result.counts)
+      convertedCounts?.forEach((count: InventoryCount) => {
+        if (count.catalogObjectId && count.quantity) {
+          inventoryCounts.set(count.catalogObjectId, Number(count.quantity))
+        }
+      })
+    } catch (error) {
+      console.error('Error fetching inventory counts:', error)
+    }
+
+    // Map items with resolved data
+    const items = activeItems.map(item => {
+      // Get vendor info from variations
+      const variations = item.itemData?.variations || []
+      let vendorId: string | undefined
+      let vendorName: string | undefined
+      let unitCost = 0
+
+      // Look through variations for vendor info
+      for (const variation of variations) {
+        const currentVendorId = extractVendorId(variation, vendorInfoMap)
+        if (currentVendorId) {
+          vendorId = currentVendorId
+          vendorName = vendorMap.get(vendorId)
+          console.log(`Found vendor info for item ${item.id}: vendorId=${vendorId}, vendorName=${vendorName}`)
+          
+          // Get unit cost if available
+          const vendorInfoIds = (variation as ExtendedCatalogItemVariation).itemVariationData?.item_variation_vendor_info_ids
+          if (vendorInfoIds && vendorInfoIds.length > 0) {
+            const vendorInfo = vendorInfoMap.get(vendorInfoIds[0])
+            if (vendorInfo?.item_variation_vendor_info_data?.cost_money) {
+              unitCost = safeMoneyToNumber(vendorInfo.item_variation_vendor_info_data.cost_money)
+            }
+          }
+          break
+        }
+      }
+
+      // Get measurement unit name if available
+      const firstVariation = variations[0]
+      const measurementUnitId = firstVariation?.itemVariationData?.measurementUnitId
+      const unitType = measurementUnitId 
+        ? unitMap.get(measurementUnitId) || 'per item'
+        : 'per item'
+
+      // Get category names
+      const itemCategoryIds = (item.itemData?.categories || []).map(c => c.id).filter((id): id is string => !!id)
+      const categories = itemCategoryIds.map(id => categoryNames.find(name => name !== 'Unknown Category') || 'Unknown Category')
+
+      // Get image URL if available
+      const imageId = item.itemData?.imageIds?.[0]
+      const imageUrl = imageId ? imageMap.get(imageId) : undefined
+
+      // Calculate total quantity from inventory counts
+      const totalQuantity = variations.reduce((sum, variation) => {
+        return sum + (inventoryCounts.get(variation.id) || 0)
+      }, 0)
+
+      // Get inventory alert threshold if available
+      const reorderPoint = Number(firstVariation?.itemVariationData?.inventoryAlertThreshold || 0)
+
+      // Map variations
+      const mappedVariations = variations.map(variation => {
+        const currentVendorId = extractVendorId(variation, vendorInfoMap)
+        const vendorInfoIds = (variation as ExtendedCatalogItemVariation).itemVariationData?.item_variation_vendor_info_ids
+        const vendorInfo = vendorInfoIds && vendorInfoIds.length > 0 ? vendorInfoMap.get(vendorInfoIds[0]) : undefined
+        const measurementUnitId = variation.itemVariationData?.measurementUnitId
+        const unitName = measurementUnitId 
+          ? unitMap.get(measurementUnitId) || 'per item'
+          : 'per item'
+
+        return {
+          id: variation.id,
+          name: variation.itemVariationData?.name || '',
+          sku: variation.itemVariationData?.sku || '',
+          price: safeMoneyToNumber(variation.itemVariationData?.priceMoney),
+          cost: vendorInfo?.item_variation_vendor_info_data?.cost_money 
+            ? safeMoneyToNumber(vendorInfo.item_variation_vendor_info_data.cost_money)
+            : 0,
+          measurementUnit: unitName,
+          vendorSku: currentVendorId ? `${currentVendorId}-${variation.itemVariationData?.sku}` : undefined,
+          quantity: inventoryCounts.get(variation.id) || 0,
+          stockable: variation.itemVariationData?.stockable ?? false
+        }
+      })
+
+      // Determine visibility based on item data
+      const visibility = item.itemData?.availableOnline 
+        ? item.itemData?.availableForPickup 
+          ? 'PUBLIC'
+          : 'PICKUP_ONLY'
+        : 'PRIVATE'
+
+      // Determine if inventory should be tracked
+      const trackInventory = variations.some(v => 
+        v.itemVariationData?.stockable || 
+        v.itemVariationData?.locationOverrides?.some(
+          override => override.trackInventory
+        )
+      )
+
+      const mappedItem = {
+        id: item.id,
+        name: item.itemData?.name || '',
+        description: item.itemData?.description || '',
+        sku: mappedVariations[0]?.sku || '',
+        categories,
+        categoryIds: itemCategoryIds,
+        price: mappedVariations[0]?.price || 0,
+        unitCost,
+        quantity: totalQuantity,
+        reorderPoint,
+        vendorId: vendorId || '',
+        vendorName: vendorName || 'No Vendor',
+        vendorCode: vendorId || '',
+        unitType,
+        measurementUnitId: measurementUnitId || '',
+        lastUpdated: item.updatedAt || new Date().toISOString(),
+        updatedBy: 'system',
+        squareId: item.id,
+        squareCatalogVersion: Number(item.version || 0),
+        squareUpdatedAt: item.updatedAt || '',
+        variations: mappedVariations,
+        isTaxable: item.itemData?.isTaxable ?? false,
+        visibility,
+        trackInventory,
+        imageUrl,
+        imageId
+      }
+
+      // Convert any BigInt values in the mapped item
+      return convertBigIntToNumber(mappedItem)
+    })
+
+    // Ensure all values are converted to regular numbers
+    const response = {
+      success: true,
+      data: convertBigIntToNumber(items)
+    }
+
+    return NextResponse.json(response)
+
+  } catch (error: any) {
+    console.error('Error fetching catalog:', error)
+    Sentry.captureException(error, {
+      extra: { context: 'catalog_api_route' }
+    })
+    return NextResponse.json({ 
+      success: false,
+      error: {
+        code: error.code || 'UNKNOWN_ERROR',
+        message: error.message || 'An unexpected error occurred',
+        details: convertBigIntToNumber(error)
+      }
+    }, { status: 500 })
+  }
+}

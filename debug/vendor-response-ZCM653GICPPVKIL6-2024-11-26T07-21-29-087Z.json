@@ -1,0 +1,31 @@
+{
+  "vendor_id": "ZCM653GICPPVKIL6",
+  "response": {
+    "vendor": {
+      "id": "ZCM653GICPPVKIL6",
+      "created_at": "2023-03-06T22:01:22.57Z",
+      "updated_at": "2023-03-06T22:01:22.57Z",
+      "name": "QUALITY STEEL CORP",
+      "address": {
+        "address_line_1": "PO BOX 11407",
+        "locality": "BIRMINGHAM",
+        "administrative_district_level_1": "ALABAMA",
+        "postal_code": "35246-6402",
+        "country": "US"
+      },
+      "contacts": [
+        {
+          "id": "UDHZCCU7TCTNFAL2",
+          "name": "Deborah Pilgrim",
+          "email_address": "qscar@propanetank.com",
+          "phone_number": "662-579-4082",
+          "removed": false,
+          "ordinal": 0
+        }
+      ],
+      "version": 1,
+      "status": "ACTIVE"
+    }
+  },
+  "timestamp": "2024-11-26T07:21:29.087Z"
+}

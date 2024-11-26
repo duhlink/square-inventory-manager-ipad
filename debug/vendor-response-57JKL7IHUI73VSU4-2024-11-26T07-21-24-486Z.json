@@ -1,0 +1,17 @@
+{
+  "vendor_id": "57JKL7IHUI73VSU4",
+  "response": {
+    "vendor": {
+      "id": "57JKL7IHUI73VSU4",
+      "created_at": "2023-11-14T00:37:27.123Z",
+      "updated_at": "2023-11-14T00:37:27.123Z",
+      "name": "New Flame Propane",
+      "address": {
+        "country": "US"
+      },
+      "version": 1,
+      "status": "ACTIVE"
+    }
+  },
+  "timestamp": "2024-11-26T07:21:24.486Z"
+}

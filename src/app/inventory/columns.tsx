@@ -226,11 +226,17 @@ export const columns: ColumnDef<InventoryItem>[] = [
         title="Vendor"
       />
     ),
-    cell: ({ row }) => (
-      <div className="max-w-[120px]">
-        <span className="truncate block">{row.getValue("vendorName") || "No Vendor"}</span>
-      </div>
-    ),
+    cell: ({ row }) => {
+      const vendorName = row.getValue("vendorName") as string
+      const vendorId = row.original.vendorId
+      return (
+        <div className="max-w-[120px]">
+          <span className="truncate block" title={vendorName || vendorId}>
+            {vendorName || (vendorId ? "Loading..." : "No Vendor")}
+          </span>
+        </div>
+      )
+    },
     enableSorting: true,
   },
   {
