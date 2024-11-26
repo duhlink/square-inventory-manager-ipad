@@ -1,0 +1,300 @@
+{
+  "total_categories": 104,
+  "category_mappings": [
+    {
+      "category_id": "AXNGYK6KC64YSKIZW26IKXM2",
+      "category_name": "Small Tanks"
+    },
+    {
+      "category_id": "YFY2TRJIJ6QJK7V2UZH3SB5P",
+      "category_name": "ASME Tanks"
+    },
+    {
+      "category_id": "POUKQJLEPWYQ7224LMAGDWLT",
+      "category_name": "Propane Delivery"
+    },
+    {
+      "category_id": "P2MRUFM75QE7IPFOYCGIC5KR",
+      "category_name": "Forklift Tanks"
+    },
+    {
+      "category_id": "A3LLKSZ52KLUQPV3MM7YWH23",
+      "category_name": "Refurbished Tanks"
+    },
+    {
+      "category_id": "JTIZL2JVL6P42JYHD3B4BXZ7",
+      "category_name": "RV & Camper Tanks"
+    },
+    {
+      "category_id": "2AVTMXMKB6V3VNHIZ2AG4QBZ",
+      "category_name": "Regulators"
+    },
+    {
+      "category_id": "WAKHIO4JSLBNYYH3FOFSUZER",
+      "category_name": "DOT Tanks"
+    },
+    {
+      "category_id": "ARTNW5ACPKAECUMFCE37OERH",
+      "category_name": "Refurbished Parts"
+    },
+    {
+      "category_id": "GZYT3Q4M2KVT2XKYP3DKQYQ4",
+      "category_name": "Underground Tanks"
+    },
+    {
+      "category_id": "HWVP3JKCRDHWP3LWGWE5GDQQ",
+      "category_name": "Hoses"
+    },
+    {
+      "category_id": "5VFDFFQ6YE3434S633ITC5Y3",
+      "category_name": "Home Delivery Services"
+    },
+    {
+      "category_id": "J5BNXBGA4LJDREMEZGKZ7ZKE",
+      "category_name": "Test Equipment"
+    },
+    {
+      "category_id": "GU5LKBH3BKJFBLL5RMWUFTBN",
+      "category_name": "Propane Installation"
+    },
+    {
+      "category_id": "JVTLUMYI2YDPFMPS72W3S45A",
+      "category_name": "Tank Exchange"
+    },
+    {
+      "category_id": "YNC3BF4AER2UMH7TRYSJCFGY",
+      "category_name": "NF Filling Station (Only)"
+    },
+    {
+      "category_id": "OV4LYK3IBAAQL62U64BRPTKY",
+      "category_name": "Firewood"
+    },
+    {
+      "category_id": "PVF6EXRN7RWC3OKNU46PQUTR",
+      "category_name": "Large Tanks"
+    },
+    {
+      "category_id": "DTW3SVWQQF7PQ7IU4QJDLN3U",
+      "category_name": "Propane Tanks"
+    },
+    {
+      "category_id": "XTGKYN3YD4F4VUAXBL3R2WT4",
+      "category_name": "Deals & Specials"
+    },
+    {
+      "category_id": "55KC5RNKSEWFOKH7EFDH5AQC",
+      "category_name": "22 Gal. - 120 Gal. Tanks"
+    },
+    {
+      "category_id": "R37FLLCWZCAORT4PQIQW4CU4",
+      "category_name": "Tanks Size by Gallon"
+    },
+    {
+      "category_id": "DA552B6S4MIPOD6N2SZJU43Y",
+      "category_name": "120 Gal - 1000 Gal"
+    },
+    {
+      "category_id": "6B5AO2MHNERSGC3BFAICL266",
+      "category_name": "11.4 Gal - 22.9 Gal Tanks"
+    },
+    {
+      "category_id": "MA33UDURIOVL562BK5XOYY6N",
+      "category_name": "4.6 Gal. - 9.9 Gal. Tanks"
+    },
+    {
+      "category_id": "YXP4V5674BJ64ILYALIANHJK",
+      "category_name": ".75 Gal. - 2.4 Gal. Tanks"
+    },
+    {
+      "category_id": "XMADM6XISI76GSLCHHR5Z7KX",
+      "category_name": "11.4 Gal - 22.9 Gal Tanks"
+    },
+    {
+      "category_id": "JXSLKZ4IMRWHVYAKG7GRNA3H",
+      "category_name": "Pre-Made Hoses"
+    },
+    {
+      "category_id": "4B2AFMHGP2M6CRLHUKCA7MGZ",
+      "category_name": "Piping & Tubing"
+    },
+    {
+      "category_id": "2O5WX7M647OYXMSPVC36E67U",
+      "category_name": "POL & QCC Fittings"
+    },
+    {
+      "category_id": "L2TN2NYKUMWO5II5USVF776L",
+      "category_name": "Valves"
+    },
+    {
+      "category_id": "E6PBWUHQ4ZBLIVIPXQ7EZK23",
+      "category_name": "Decals & Stickers"
+    },
+    {
+      "category_id": "KCZK2FYWLMB6BBEHEB4OVRGW",
+      "category_name": "BBQ Tanks & Accessories"
+    },
+    {
+      "category_id": "WF5Q2LHHOVYRHFNDCS2ZCWIJ",
+      "category_name": "COMMERCIAL FITTINGS"
+    },
+    {
+      "category_id": "6G3F74SE6WMZBSUO5XG57ZBY",
+      "category_name": "Fittings & Parts"
+    },
+    {
+      "category_id": "GVCDIW725BECCJYTOBKM3NRR",
+      "category_name": "Hose Fittings"
+    },
+    {
+      "category_id": "WCPWYFCHNVA36WPICOPDVXRT",
+      "category_name": "Tube Fittings"
+    },
+    {
+      "category_id": "QHQSGE7TUW5WBDTLVKMRAUGB",
+      "category_name": "Brass Fittings"
+    },
+    {
+      "category_id": "Y5NXPT4CYFJRRYPJACVBMCKN",
+      "category_name": "Tube Fittings"
+    },
+    {
+      "category_id": "IEEYUXBPXFOFH5IPGXA7ZLUM",
+      "category_name": "Tank Monitoring"
+    },
+    {
+      "category_id": "W52MJTC5HGISXKGK4BVU6X7F",
+      "category_name": "Tank Replacement Parts"
+    },
+    {
+      "category_id": "NYBEDETN64XZWLUDFH2W5J6T",
+      "category_name": "Safety Equipment"
+    },
+    {
+      "category_id": "FQLDAVHIV7UAWVTOA27QZNYG",
+      "category_name": "RV & Camper"
+    },
+    {
+      "category_id": "UC3GSABJD4BBFCP5PZMRRLB3",
+      "category_name": "Uncategorized"
+    },
+    {
+      "category_id": "HANJOWY2HK7G5S7B3ARSIGBU",
+      "category_name": "Regulators"
+    },
+    {
+      "category_id": "ABFDKBLXBGJHGKVSPYXZ2F74",
+      "category_name": "Used Parts"
+    },
+    {
+      "category_id": "TNC7DCMZ75RDVERRFJQDQL3K",
+      "category_name": "Installation Equipment"
+    },
+    {
+      "category_id": "KSZUCQN5HOUWJRYN4HBXCJ7M",
+      "category_name": "Fittings & Parts"
+    },
+    {
+      "category_id": "QQ6LVMFXRJOGMWMEVEKZ6HF7",
+      "category_name": "Tank Exchange"
+    },
+    {
+      "category_id": "7CHHISHJQABEWKNCZT5S27T7",
+      "category_name": "Propane Tanks"
+    },
+    {
+      "category_id": "NPYRDLQ4ORFXWKHWVP33WDDY",
+      "category_name": "Deals & Specials"
+    },
+    {
+      "category_id": "WIKPAX7YAHJNSUXNRSK672U3",
+      "category_name": "Hoses"
+    },
+    {
+      "category_id": "KIGCURRYHR5IHK6VQMQKBDVG",
+      "category_name": "Valves"
+    },
+    {
+      "category_id": "X27RGWWLEM5RPQGJM3TA3E2M",
+      "category_name": "Gauges"
+    },
+    {
+      "category_id": "ZVLCHTTNIR4HWGJIZN5RUNBE",
+      "category_name": "Piping & Tubing"
+    },
+    {
+      "category_id": "HOYHI6HVMXOY2NCOBHLSGSVA",
+      "category_name": "BBQ Tanks & Accessories"
+    },
+    {
+      "category_id": "EYMPT42QW63XLNPP2O4RSETH",
+      "category_name": "Tank Monitoring"
+    },
+    {
+      "category_id": "BUDHUTSIJUGIJAFGNV6B2IFE",
+      "category_name": "Propane Hoses & Parts"
+    },
+    {
+      "category_id": "ENQRUZXBWMEHVRYWQZERM2IB",
+      "category_name": "Propane Tanks"
+    },
+    {
+      "category_id": "X5PAWNJ33RXLXF3465YTGPV4",
+      "category_name": "Small Tanks"
+    },
+    {
+      "category_id": "TO5W2IA34T24RSE43KSLG45W",
+      "category_name": "Home Tanks"
+    },
+    {
+      "category_id": "PQAASNFWLRT7AHSNV2DM7RV4",
+      "category_name": "Propane Accessories"
+    },
+    {
+      "category_id": "FIMNOYPV4MM6HGMZLM26TNAG",
+      "category_name": "Flame King Tanks & Accessories"
+    },
+    {
+      "category_id": "KQVQ6WMKSNQDDKHCTH3BRFPU",
+      "category_name": "Tanks Size by Gallon"
+    },
+    {
+      "category_id": "5YY6PI3HWY6SKWGNXOJYBPFY",
+      "category_name": ".75 Gal. - 2.4 Gal. Tanks"
+    },
+    {
+      "category_id": "JLDYDSNLOWDDC3Q7TVG6LSQU",
+      "category_name": "4.6 Gal. - 9.9 Gal. Tanks"
+    },
+    {
+      "category_id": "RCGAGN5HK7CLF4S4PCQSXV6A",
+      "category_name": "11.4 Gal - 22.9 Gal Tanks"
+    },
+    {
+      "category_id": "7X2WCIPUZIXFJYZ6MLA4A4VI",
+      "category_name": "120 Gal - 1000 Gal"
+    },
+    {
+      "category_id": "E7AVR3OA2LK3CPB736PISHI2",
+      "category_name": "ASME Tanks"
+    },
+    {
+      "category_id": "2CVWJOKZMKYMRA6MXZXDGPBX",
+      "category_name": "DOT Tanks"
+    },
+    {
+      "category_id": "KO5WVGYDEVUD5HKCKWZKRE55",
+      "category_name": "Underground Tanks"
+    },
+    {
+      "category_id": "Q5XNXLPI6IB3B4KAUGK4R7EZ",
+      "category_name": "Small Tank"
+    },
+    {
+      "category_id": "T62XSES4RWJHOAAQPHPMHOSL",
+      "category_name": ".75 Gal. - 2.4 Gal. Tanks"
+    },
+    {
+      "category_id": "A4OZORFO5PK3BP3GU3WATODC",
+      "category_name": "4.6 Gal. - 9.9 Gal. Tanks"
+    },
+    {

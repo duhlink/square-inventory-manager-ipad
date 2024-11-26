@@ -57,6 +57,23 @@ export interface ItemVendorData {
   vendorCode?: string
 }
 
+// Category interfaces
+export interface CategoryOption {
+  value: string
+  label: string
+}
+
+export interface CategoryMapping {
+  id: string
+  name: string
+}
+
+export interface CategoryData {
+  total_categories: number
+  category_mappings: CategoryMapping[]
+  all_categories: CategoryOption[]
+}
+
 // Debug logging interfaces
 export interface VendorDebugInfo {
   item_id: string
@@ -127,5 +144,13 @@ export interface CatalogVendorInfo {
       variation_id: string
       vendor_infos: VendorInfo[]
     }>
+  }>
+}
+
+export interface CatalogCategoryInfo {
+  page: number
+  categories: Array<{
+    id: string
+    name: string
   }>
 }

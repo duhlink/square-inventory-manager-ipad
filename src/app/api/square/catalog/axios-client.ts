@@ -1,4 +1,4 @@
-import axios, { AxiosResponse, AxiosError } from 'axios'
+import axios, { AxiosResponse } from 'axios'
 import fs from 'fs'
 import path from 'path'
 
@@ -34,6 +34,7 @@ interface CatalogObject {
   }
   item_data?: {
     name: string
+    category_ids?: string[]
     variations?: Array<{
       id: string
       item_variation_data?: {
@@ -76,6 +77,11 @@ interface VendorResponse {
   }>
 }
 
+interface CategoryOption {
+  value: string
+  label: string
+}
+
 const axiosClient = axios.create({
   baseURL: SQUARE_API_URL,
   headers: {
@@ -85,29 +91,7 @@ const axiosClient = axios.create({
   }
 })
 
-// Helper function to manage debug files
-const manageDebugFiles = (debugDir: string, prefix: string) => {
-  const files = fs.readdirSync(debugDir)
-    .filter(file => file.startsWith(prefix))
-    .sort((a, b) => {
-      const timeA = fs.statSync(path.join(debugDir, a)).mtime.getTime()
-      const timeB = fs.statSync(path.join(debugDir, b)).mtime.getTime()
-      return timeB - timeA
-    })
-
-  // Keep only the last 250 files
-  if (files.length > 250) {
-    files.slice(250).forEach(file => {
-      try {
-        fs.unlinkSync(path.join(debugDir, file))
-      } catch (error) {
-        console.error(`Error removing old debug file ${file}:`, error)
-      }
-    })
-  }
-}
-
-// Helper function to write debug data
+// Helper function to write debug data with limits
 const writeDebugToFile = (data: any, prefix: string) => {
   try {
     const debugDir = path.join(process.cwd(), 'debug')
@@ -115,10 +99,61 @@ const writeDebugToFile = (data: any, prefix: string) => {
       fs.mkdirSync(debugDir, { recursive: true })
     }
 
+    // Truncate data to 300 lines
+    const dataString = JSON.stringify(data, null, 2)
+    const lines = dataString.split('\n')
+    const truncatedData = lines.slice(0, 300).join('\n')
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filePath = path.join(debugDir, `${prefix}-${timestamp}.json`)
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2))
-    manageDebugFiles(debugDir, prefix)
+    fs.writeFileSync(filePath, truncatedData)
+
+    // Get all debug files and group by prefix
+    const files = fs.readdirSync(debugDir)
+    const filesByPrefix = new Map<string, string[]>()
+    
+    files.forEach(file => {
+      const filePrefix = file.split('-')[0]
+      if (!filesByPrefix.has(filePrefix)) {
+        filesByPrefix.set(filePrefix, [])
+      }
+      filesByPrefix.get(filePrefix)?.push(file)
+    })
+
+    // Keep only the most recent file per prefix
+    filesByPrefix.forEach((prefixFiles, filePrefix) => {
+      const sortedFiles = prefixFiles.sort((a, b) => {
+        const timeA = fs.statSync(path.join(debugDir, a)).mtime.getTime()
+        const timeB = fs.statSync(path.join(debugDir, b)).mtime.getTime()
+        return timeB - timeA
+      })
+
+      // Remove all but the most recent file for this prefix
+      sortedFiles.slice(1).forEach(file => {
+        try {
+          fs.unlinkSync(path.join(debugDir, file))
+        } catch (error) {
+          console.error(`Error removing old debug file ${file}:`, error)
+        }
+      })
+    })
+
+    // Keep only 10 most recent files total
+    const allFiles = fs.readdirSync(debugDir)
+      .map(file => ({
+        name: file,
+        time: fs.statSync(path.join(debugDir, file)).mtime.getTime()
+      }))
+      .sort((a, b) => b.time - a.time)
+
+    allFiles.slice(10).forEach(file => {
+      try {
+        fs.unlinkSync(path.join(debugDir, file.name))
+      } catch (error) {
+        console.error(`Error removing old debug file ${file.name}:`, error)
+      }
+    })
+
   } catch (error) {
     console.error(`Error writing debug file for ${prefix}:`, error)
   }
@@ -138,31 +173,6 @@ export async function listCatalog(): Promise<{ objects: CatalogObject[] }> {
         }
       })
 
-      // Log each page's vendor information
-      if (response.data.objects) {
-        const vendorInfo = response.data.objects
-          .filter(obj => obj.type === 'ITEM' && !obj.is_deleted)
-          .map(item => {
-            const variations = item.item_data?.variations || []
-            return {
-              item_id: item.id,
-              item_name: item.item_data?.name,
-              variations: variations.map((variation: { id: string, item_variation_data?: any }) => ({
-                variation_id: variation.id,
-                vendor_infos: variation.item_variation_data?.item_variation_vendor_infos || []
-              }))
-            }
-          })
-          .filter(item => item.variations.some((v: { vendor_infos: any[] }) => v.vendor_infos.length > 0))
-
-        if (vendorInfo.length > 0) {
-          writeDebugToFile({
-            page: pageCount + 1,
-            vendor_info: vendorInfo
-          }, 'catalog-vendor-info')
-        }
-      }
-
       if (response.data.errors) {
         console.error('Square API errors:', response.data.errors)
       }
@@ -176,6 +186,24 @@ export async function listCatalog(): Promise<{ objects: CatalogObject[] }> {
 
     } while (cursor)
 
+    // Extract categories and items for debugging
+    const categories = allObjects.filter(obj => obj.type === 'CATEGORY' && !obj.is_deleted)
+    const items = allObjects.filter(obj => obj.type === 'ITEM' && !obj.is_deleted)
+
+    // Write detailed catalog debug info
+    writeDebugToFile({
+      total_objects: allObjects.length,
+      categories: categories.map(cat => ({
+        id: cat.id,
+        name: cat.category_data?.name,
+      })),
+      items: items.map(item => ({
+        id: item.id,
+        name: item.item_data?.name,
+        category_ids: item.item_data?.category_ids
+      }))
+    }, 'catalog')
+
     return {
       objects: allObjects
     }
@@ -186,6 +214,58 @@ export async function listCatalog(): Promise<{ objects: CatalogObject[] }> {
   }
 }
 
+export async function retrieveCategories(categoryIds: string[]): Promise<Map<string, string>> {
+  try {
+    if (!categoryIds.length) {
+      console.log('No category IDs to retrieve')
+      return new Map()
+    }
+
+    console.log(`Retrieving categories for IDs:`, categoryIds)
+
+    const response: AxiosResponse<SquareResponse> = await axiosClient.post('/catalog/batch-retrieve', {
+      object_ids: categoryIds,
+      include_related_objects: false
+    })
+
+    writeDebugToFile({
+      request: {
+        category_ids: categoryIds,
+        timestamp: new Date().toISOString()
+      },
+      response: response.data
+    }, 'category-response')
+
+    const categoryMap = new Map<string, string>()
+    
+    if (response.data.objects) {
+      response.data.objects.forEach(obj => {
+        if (obj.type === 'CATEGORY' && !obj.is_deleted && obj.id) {
+          const name = obj.category_data?.name?.trim()
+          categoryMap.set(obj.id, name || obj.id)
+        }
+      })
+    }
+
+    writeDebugToFile({
+      total_requested: categoryIds.length,
+      total_retrieved: categoryMap.size,
+      category_mappings: Array.from(categoryMap.entries()).map(([id, name]) => ({
+        id,
+        name
+      }))
+    }, 'category-mappings')
+
+    return categoryMap
+
+  } catch (error) {
+    console.error('Error retrieving categories:', error)
+    const categoryMap = new Map<string, string>()
+    categoryIds.forEach(id => categoryMap.set(id, id))
+    return categoryMap
+  }
+}
+
 export async function bulkRetrieveVendors(vendorIds: string[]): Promise<Map<string, string>> {
   try {
     if (!vendorIds.length) {
@@ -193,17 +273,14 @@ export async function bulkRetrieveVendors(vendorIds: string[]): Promise<Map<stri
       return new Map()
     }
 
-    // Log the request attempt
     console.log(`Attempting to retrieve vendors for IDs:`, vendorIds)
 
-    // Make individual requests for each vendor ID
     const vendorMap = new Map<string, string>()
     
     for (const vendorId of vendorIds) {
       try {
         const response: AxiosResponse<{ vendor?: Vendor }> = await axiosClient.get(`/vendors/${vendorId}`)
         
-        // Log individual vendor response
         writeDebugToFile({
           vendor_id: vendorId,
           response: response.data,
@@ -223,67 +300,23 @@ export async function bulkRetrieveVendors(vendorIds: string[]): Promise<Map<stri
       }
     }
 
-    // Log vendor mapping summary
-    const vendorSummary = {
+    writeDebugToFile({
       total_requested: vendorIds.length,
       total_retrieved: vendorMap.size,
-      vendor_mappings: Array.from(vendorMap.entries()).map(([id, name]) => ({ id, name }))
-    }
-    writeDebugToFile(vendorSummary, 'vendor-mappings')
-
-    console.log(`Retrieved ${vendorMap.size} vendors out of ${vendorIds.length} requested`)
+      vendor_mappings: Array.from(vendorMap.entries()).map(([id, name]) => ({
+        id,
+        name
+      }))
+    }, 'vendor-mappings')
 
     return vendorMap
 
   } catch (error: unknown) {
     console.error('Error in vendor retrieve:', error)
-    
-    // Log the full error details
-    if (error instanceof Error) {
-      writeDebugToFile({
-        timestamp: new Date().toISOString(),
-        error: {
-          message: error.message,
-          stack: error.stack,
-          response: axios.isAxiosError(error) ? error.response?.data : undefined
-        }
-      }, 'vendor-error-details')
-    }
-
-    // Create default mappings for all vendor IDs
     const vendorMap = new Map<string, string>()
-    vendorIds.forEach(id => {
-      vendorMap.set(id, id)
-    })
+    vendorIds.forEach(id => vendorMap.set(id, id))
     return vendorMap
   }
-}
-
-export function extractCategoryNames(objects: CatalogObject[]): Map<string, string> {
-  const categoryMap = new Map<string, string>()
-  
-  const categories = objects.filter(obj => obj.type === 'CATEGORY' && !obj.is_deleted)
-  categories.forEach(category => {
-    if (category.id) {
-      // Use category name if available and not empty, otherwise use ID
-      const name = category.category_data?.name?.trim()
-      if (name) {
-        categoryMap.set(category.id, name)
-      } else {
-        console.warn(`No name found for category ID: ${category.id}`)
-        categoryMap.set(category.id, category.id)
-      }
-    }
-  })
-
-  // Log category mapping summary
-  console.log(`Extracted ${categoryMap.size} categories`)
-  writeDebugToFile({
-    total_categories: categoryMap.size,
-    category_mappings: Array.from(categoryMap.entries()).map(([id, name]) => ({ id, name }))
-  }, 'category-mappings')
-
-  return categoryMap
 }
 
 export function extractImageUrls(objects: CatalogObject[]): Map<string, string> {
