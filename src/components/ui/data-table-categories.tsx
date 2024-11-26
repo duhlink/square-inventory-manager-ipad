@@ -61,7 +61,8 @@ export function DataTableCategories<TData>({
     if (column) {
       setFiltering(true)
       console.log('Setting category filter:', selectedValues)
-      column.setFilterValue(selectedValues.length ? selectedValues : undefined)
+      // Pass the array of selected values directly
+      column.setFilterValue(selectedValues)
       // Simulate filtering delay
       setTimeout(() => {
         setFiltering(false)
@@ -98,7 +99,7 @@ export function DataTableCategories<TData>({
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[200px]">
+      <DropdownMenuContent align="end" className="w-[250px]">
         <DropdownMenuLabel>Filter Categories</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {loading ? (
@@ -121,7 +122,7 @@ export function DataTableCategories<TData>({
                 return (
                   <DropdownMenuCheckboxItem
                     key={category.value}
-                    className="capitalize"
+                    className="flex items-center pr-6"
                     checked={isSelected}
                     onCheckedChange={(checked) => {
                       if (checked) {
@@ -131,7 +132,9 @@ export function DataTableCategories<TData>({
                       }
                     }}
                   >
-                    {category.label}
+                    <div className="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
+                      {category.label}
+                    </div>
                   </DropdownMenuCheckboxItem>
                 )
               })

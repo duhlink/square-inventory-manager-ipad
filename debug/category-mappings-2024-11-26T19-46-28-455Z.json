@@ -1,0 +1,100 @@
+{
+  "total_requested": 104,
+  "total_retrieved": 104,
+  "category_mappings": [
+    {
+      "id": "AXNGYK6KC64YSKIZW26IKXM2",
+      "name": "Small Tanks"
+    },
+    {
+      "id": "YFY2TRJIJ6QJK7V2UZH3SB5P",
+      "name": "ASME Tanks"
+    },
+    {
+      "id": "POUKQJLEPWYQ7224LMAGDWLT",
+      "name": "Propane Delivery"
+    },
+    {
+      "id": "P2MRUFM75QE7IPFOYCGIC5KR",
+      "name": "Forklift Tanks"
+    },
+    {
+      "id": "A3LLKSZ52KLUQPV3MM7YWH23",
+      "name": "Refurbished Tanks"
+    },
+    {
+      "id": "JTIZL2JVL6P42JYHD3B4BXZ7",
+      "name": "RV & Camper Tanks"
+    },
+    {
+      "id": "2AVTMXMKB6V3VNHIZ2AG4QBZ",
+      "name": "Regulators"
+    },
+    {
+      "id": "WAKHIO4JSLBNYYH3FOFSUZER",
+      "name": "DOT Tanks"
+    },
+    {
+      "id": "ARTNW5ACPKAECUMFCE37OERH",
+      "name": "Refurbished Parts"
+    },
+    {
+      "id": "GZYT3Q4M2KVT2XKYP3DKQYQ4",
+      "name": "Underground Tanks"
+    },
+    {
+      "id": "HWVP3JKCRDHWP3LWGWE5GDQQ",
+      "name": "Hoses"
+    },
+    {
+      "id": "5VFDFFQ6YE3434S633ITC5Y3",
+      "name": "Home Delivery Services"
+    },
+    {
+      "id": "J5BNXBGA4LJDREMEZGKZ7ZKE",
+      "name": "Test Equipment"
+    },
+    {
+      "id": "GU5LKBH3BKJFBLL5RMWUFTBN",
+      "name": "Propane Installation"
+    },
+    {
+      "id": "JVTLUMYI2YDPFMPS72W3S45A",
+      "name": "Tank Exchange"
+    },
+    {
+      "id": "YNC3BF4AER2UMH7TRYSJCFGY",
+      "name": "NF Filling Station (Only)"
+    },
+    {
+      "id": "OV4LYK3IBAAQL62U64BRPTKY",
+      "name": "Firewood"
+    },
+    {
+      "id": "PVF6EXRN7RWC3OKNU46PQUTR",
+      "name": "Large Tanks"
+    },
+    {
+      "id": "DTW3SVWQQF7PQ7IU4QJDLN3U",
+      "name": "Propane Tanks"
+    },
+    {
+      "id": "XTGKYN3YD4F4VUAXBL3R2WT4",
+      "name": "Deals & Specials"
+    },
+    {
+      "id": "55KC5RNKSEWFOKH7EFDH5AQC",
+      "name": "22 Gal. - 120 Gal. Tanks"
+    },
+    {
+      "id": "R37FLLCWZCAORT4PQIQW4CU4",
+      "name": "Tanks Size by Gallon"
+    },
+    {
+      "id": "DA552B6S4MIPOD6N2SZJU43Y",
+      "name": "120 Gal - 1000 Gal"
+    },
+    {
+      "id": "6B5AO2MHNERSGC3BFAICL266",
+      "name": "11.4 Gal - 22.9 Gal Tanks"
+    },

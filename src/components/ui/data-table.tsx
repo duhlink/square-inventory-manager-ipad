@@ -133,24 +133,26 @@ export function DataTable<TData>({
   }, [handleColumnResize])
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-none">
-        <DataTableToolbar 
-          table={table}
-          filterableColumns={filterableColumns}
-          isFiltering={isFiltering}
-        />
-      </div>
-      {status && (
-        <div className="flex-none mt-2">
-          <StatusMessage 
-            message={status.message} 
-            type={status.type} 
+    <div className="flex flex-col h-full max-h-[calc(100vh-7rem)] md:max-h-[calc(100vh-8rem)] lg:max-h-[calc(100vh-9rem)]">
+      <div className="flex-none border-b bg-background">
+        <div className="p-4">
+          <DataTableToolbar 
+            table={table}
+            filterableColumns={filterableColumns}
+            isFiltering={isFiltering}
           />
+          {status && (
+            <div className="mt-2">
+              <StatusMessage 
+                message={status.message} 
+                type={status.type} 
+              />
+            </div>
+          )}
         </div>
-      )}
-      <div className="flex-1 min-h-0 mt-2 border rounded-md">
-        <div className="h-full overflow-auto">
+      </div>
+      <div className="flex-1 min-h-0 overflow-auto border-b">
+        <div className="min-w-full">
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -260,8 +262,10 @@ export function DataTable<TData>({
           </Table>
         </div>
       </div>
-      <div className="flex-none mt-2">
-        <DataTablePagination table={table} />
+      <div className="sticky bottom-0 flex-none bg-background border-t">
+        <div className="p-4">
+          <DataTablePagination table={table} />
+        </div>
       </div>
     </div>
   )

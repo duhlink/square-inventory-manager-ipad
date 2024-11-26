@@ -17,6 +17,16 @@ interface SquareResponse {
   }>
 }
 
+interface Location {
+  id: string
+  name: string
+  status: string
+}
+
+interface LocationResponse {
+  locations?: Location[]
+}
+
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 async function retryWithBackoff<T>(
@@ -45,6 +55,38 @@ export const axiosClient = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+export async function listLocations(): Promise<Map<string, string>> {
+  try {
+    const response = await retryWithBackoff(() => 
+      axiosClient.get<LocationResponse>('/locations')
+    )
+
+    const locationMap = new Map<string, string>()
+    
+    if (response.data.locations) {
+      response.data.locations.forEach(location => {
+        if (location.status === 'ACTIVE') {
+          locationMap.set(location.id, location.name)
+        }
+      })
+    }
+
+    writeDebugToFile({
+      total_locations: locationMap.size,
+      locations: Array.from(locationMap.entries()).map(([id, name]) => ({
+        id,
+        name
+      }))
+    }, 'locations')
+
+    return locationMap
+
+  } catch (error) {
+    console.error('Error fetching locations:', error)
+    throw error
+  }
+}
 
 export async function listCatalog(): Promise<{ objects: CatalogObject[] }> {
   try {

@@ -29,8 +29,8 @@ export function DataTableToolbar<TData>({
   const isFiltered = table.getState().columnFilters.length > 0
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div className="flex flex-1 flex-wrap items-center gap-2">
+    <div className="flex items-center justify-between space-x-2 py-4">
+      <div className="flex flex-1 items-center space-x-2">
         <div className="relative">
           <Input
             placeholder="Filter records..."
@@ -46,9 +46,12 @@ export function DataTableToolbar<TData>({
             </div>
           )}
         </div>
-        {table.getColumn("categories") && (
-          <DataTableCategories table={table} />
-        )}
+        <div className="flex items-center space-x-2">
+          {table.getColumn("categories") && (
+            <DataTableCategories table={table} />
+          )}
+          <DataTableViewOptions table={table} />
+        </div>
         {isFiltered && (
           <Button
             variant="ghost"
@@ -60,7 +63,6 @@ export function DataTableToolbar<TData>({
           </Button>
         )}
       </div>
-      <DataTableViewOptions table={table} />
     </div>
   )
 }

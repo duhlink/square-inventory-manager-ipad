@@ -23,6 +23,7 @@
     "@radix-ui/react-toast": "^1.2.2",
     "@sentry/nextjs": "^8.40.0",
     "@square/web-sdk": "^2.0.1",
+    "@tanstack/react-query": "^5.61.3",
     "@tanstack/react-table": "^8.20.5",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
@@ -34,6 +35,7 @@
     "react-dom": "^18.3.1",
     "react-hook-form": "^7.53.2",
     "square": "^39.0.0",
+    "swr": "^2.2.5",
     "tailwind-merge": "^2.5.4",
     "zod": "^3.23.8"
   },

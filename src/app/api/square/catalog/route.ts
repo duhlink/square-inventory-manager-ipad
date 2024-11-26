@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
-import { listCatalog, retrieveCategories } from './axios-client'
+import { listCatalog, retrieveCategories, listLocations } from './axios-client'
 import { bulkRetrieveVendors } from './vendor-utils'
-import { extractImageUrls, extractMeasurementUnits } from './transform-utils'
+import { 
+  extractImageUrls, 
+  extractMeasurementUnits,
+  createVariationOptions,
+  VariationOption
+} from './transform-utils'
 import { CatalogItem, ItemVariation } from './types'
 import {
   writeDebugToFile,
@@ -23,6 +28,10 @@ export async function GET() {
   try {
     console.log('Starting catalog request...')
     
+    // Get locations first
+    const locationMap = await listLocations()
+    console.log(`Found ${locationMap.size} active locations`)
+
     const response = await listCatalog()
     
     const imageMap = extractImageUrls(response.objects || [])
@@ -39,6 +48,7 @@ export async function GET() {
     const categoryIds = new Set<string>()
     const itemCategoryMap = new Map<string, string[]>()
     const itemVariations: { catalogItemId: string, variationId: string }[] = []
+    const variationOptionsMap = new Map<string, VariationOption[]>()
     
     activeItems.forEach(item => {
       const itemCategoryIds = extractCategoryIds(item)
@@ -48,6 +58,11 @@ export async function GET() {
       }
 
       const variations = item.item_data?.variations || []
+      // Create variation options for each item
+      if (variations.length > 0) {
+        variationOptionsMap.set(item.id, createVariationOptions(variations))
+      }
+
       variations.forEach((variation: ItemVariation) => {
         if (variation.id) {
           itemVariations.push({
@@ -62,17 +77,10 @@ export async function GET() {
       })
     })
 
+    console.log(`Fetching inventory for ${itemVariations.length} variations`)
     writeDebugToFile({
-      total_items: activeItems.length,
-      items_with_categories: activeItems.filter(item => extractCategoryIds(item).length > 0).length,
-      unique_category_ids: Array.from(categoryIds),
-      item_category_mapping: Array.from(itemCategoryMap.entries()).map(([itemId, catIds]) => ({
-        item_id: itemId,
-        item_name: activeItems.find(item => item.id === itemId)?.item_data?.name,
-        category_ids: catIds,
-        raw_categories: activeItems.find(item => item.id === itemId)?.item_data?.categories
-      }))
-    }, 'category-collection')
+      variation_sample: itemVariations.slice(0, 5)
+    }, 'variations-to-fetch')
 
     const [vendorMap, categoryMap, inventoryResponse] = await Promise.all([
       bulkRetrieveVendors(Array.from(vendorIds)),
@@ -80,92 +88,110 @@ export async function GET() {
       inventoryService.retrieveInventoryCounts(itemVariations)
     ])
 
-    // Initialize inventory counts with a default empty Map if the response wasn't successful
-    const inventoryCounts: Map<string, number> = inventoryResponse.success && inventoryResponse.data instanceof Map 
-      ? inventoryResponse.data 
-      : new Map<string, number>()
-
     writeDebugToFile({
-      total_categories: categoryIds.size,
-      category_mappings: Array.from(categoryMap.entries()).map((entry: [string, string]) => ({
-        category_id: entry[0],
-        category_name: entry[1]
-      })),
-      raw_category_ids: Array.from(categoryIds)
-    }, 'category-mapping')
+      inventory_response: {
+        success: inventoryResponse.success,
+        data_size: inventoryResponse.data instanceof Map ? inventoryResponse.data.size : 0,
+        sample: inventoryResponse.data instanceof Map ? 
+          Array.from(inventoryResponse.data.entries()).slice(0, 5) : 
+          'Not a Map'
+      }
+    }, 'inventory-response')
+
+    const inventoryCounts = new Map<string, number>()
+    if (inventoryResponse.success && inventoryResponse.data instanceof Map) {
+      inventoryResponse.data.forEach((value, key) => {
+        inventoryCounts.set(key, value)
+      })
+    }
+
+    console.log(`Retrieved ${inventoryCounts.size} inventory counts`)
+    writeDebugToFile({
+      inventory_counts: {
+        total: inventoryCounts.size,
+        sample: Array.from(inventoryCounts.entries()).slice(0, 5)
+      }
+    }, 'processed-inventory')
 
     const allCategories = createCategoryOptions(categoryMap)
 
     const mappedItems = activeItems.map(item => {
       const variations = item.item_data?.variations || []
-      const firstVariation = variations[0]
       const vendorId = extractVendorId(item)
       const vendorName = getVendorName(vendorId, vendorMap)
-
       const categoryIds = extractCategoryIds(item)
       const categoryNames = getCategoryNames(categoryIds, categoryMap)
-
       const imageId = item.item_data?.image_ids?.[0]
       const imageUrl = imageId ? imageMap.get(imageId) : undefined
-
-      const mappedVariations = mapVariations(variations, measurementUnitMap, vendorMap)
+      const variationOptions = variationOptionsMap.get(item.id) || []
 
       // Calculate total quantity across all variations
       const quantity = variations.reduce((total, variation) => {
         return total + (inventoryCounts.get(variation.id || '') || 0)
       }, 0)
 
+      const firstVariation = variations[0]
+      const variationData = firstVariation?.item_variation_data
+
       return {
         id: item.id,
+        variationId: firstVariation?.id,
         name: item.item_data?.name || '',
+        variationName: variationData?.name || '',
         description: item.item_data?.description || '',
-        sku: firstVariation?.item_variation_data?.sku || '',
+        sku: variationData?.sku || '',
         categories: categoryNames,
         categoryIds,
-        price: safeMoneyToNumber(firstVariation?.item_variation_data?.price_money),
-        unitCost: 0,
-        quantity,
-        reorderPoint: Number(firstVariation?.item_variation_data?.inventory_alert_threshold || 0),
+        variations: variationOptions,
+        price: safeMoneyToNumber(variationData?.price_money),
+        unitCost: safeMoneyToNumber(variationData?.default_unit_cost),
+        ordinal: variationData?.ordinal || 0,
+        trackInventory: variationData?.track_inventory ?? false,
+        sellable: variationData?.sellable ?? false,
+        stockable: variationData?.stockable ?? false,
+        defaultUnitCost: safeMoneyToNumber(variationData?.default_unit_cost),
+        reorderPoint: Number(variationData?.inventory_alert_threshold || 0),
         vendorId: vendorId || '',
         vendorName,
         vendorCode: vendorId || '',
-        unitType: firstVariation?.item_variation_data?.measurement_unit_id ? 
-          measurementUnitMap.get(firstVariation.item_variation_data.measurement_unit_id) || 'unit' :
+        unitType: variationData?.measurement_unit_id ? 
+          measurementUnitMap.get(variationData.measurement_unit_id) || 'unit' :
           'unit',
-        measurementUnitId: firstVariation?.item_variation_data?.measurement_unit_id || '',
+        measurementUnitId: variationData?.measurement_unit_id || '',
         lastUpdated: item.updated_at || new Date().toISOString(),
         updatedBy: 'system',
         squareId: item.id,
         squareCatalogVersion: Number(item.version || 0),
         squareUpdatedAt: item.updated_at || '',
-        variations: mappedVariations,
         isTaxable: item.item_data?.is_taxable ?? false,
         visibility: item.item_data?.available_online 
           ? item.item_data?.available_for_pickup 
             ? 'PUBLIC'
             : 'PICKUP_ONLY'
           : 'PRIVATE',
-        trackInventory: variations.some((v: ItemVariation) => v.item_variation_data?.stockable),
+        presentAtAllLocations: item.present_at_all_locations,
+        presentAtLocationIds: item.present_at_location_ids || [],
         imageUrl,
-        imageId
+        imageId,
+        quantity
       }
     })
 
     writeDebugToFile({
       total_items: mappedItems.length,
-      items_with_categories: mappedItems.map(item => ({
+      items_sample: mappedItems.slice(0, 5).map(item => ({
         id: item.id,
         name: item.name,
-        categories: item.categories,
-        category_ids: item.categoryIds,
-        original_categories: activeItems.find(ai => ai.id === item.id)?.item_data?.categories
+        variations: item.variations.length,
+        quantity: item.quantity
       }))
-    }, 'categories')
+    }, 'mapped-items')
 
     return NextResponse.json({
       success: true,
       data: mappedItems,
-      categories: allCategories
+      categories: allCategories,
+      locations: Array.from(locationMap.entries()).map(([id, name]) => ({ id, name }))
     })
 
   } catch (error: any) {

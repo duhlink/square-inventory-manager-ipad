@@ -110,6 +110,7 @@ export class InventoryService {
     const cacheKey = `inventory_counts_${items.map(i => i.variationId).join('_')}`
     const cachedData = this.cache.get(cacheKey)
     if (cachedData) {
+      console.log('Using cached inventory counts')
       return cachedData
     }
 
@@ -125,24 +126,28 @@ export class InventoryService {
         batches.push(items.slice(i, i + this.batchSize))
       }
 
+      console.log(`Processing ${batches.length} batches for inventory counts`)
       const inventoryCounts = new Map<string, number>()
 
       for (const batch of batches) {
+        console.log(`Fetching inventory for batch of ${batch.length} items`)
         const { result } = await squareClient.inventoryApi.batchRetrieveInventoryCounts({
           catalogObjectIds: batch.map(item => item.variationId),
           states: [INVENTORY_STATES.IN_STOCK]
         })
 
+        console.log('Inventory API response:', {
+          totalCounts: result.counts?.length || 0,
+          sampleCount: result.counts?.[0],
+          requestedIds: batch.map(item => item.variationId)
+        })
+
         if (result.counts) {
           result.counts.forEach(count => {
-            if (count.catalogObjectId) {
-              const item = batch.find(i => i.variationId === count.catalogObjectId)
-              if (item && count.quantity) {
-                inventoryCounts.set(
-                  item.catalogItemId,
-                  parseInt(count.quantity)
-                )
-              }
+            if (count.catalogObjectId && count.quantity) {
+              const quantity = parseInt(count.quantity)
+              console.log(`Setting inventory for ${count.catalogObjectId}: ${quantity}`)
+              inventoryCounts.set(count.catalogObjectId, quantity)
             }
           })
         }
@@ -150,11 +155,22 @@ export class InventoryService {
         await this.checkRateLimit()
       }
 
+      console.log('Final inventory counts:', {
+        totalItems: items.length,
+        totalCounts: inventoryCounts.size,
+        sample: Array.from(inventoryCounts.entries()).slice(0, 5)
+      })
+
       const response = { success: true, data: inventoryCounts }
       this.cache.set(cacheKey, response)
       return response
 
     } catch (error: any) {
+      console.error('Error retrieving inventory counts:', {
+        error,
+        items: items.length,
+        firstItem: items[0]
+      })
       Sentry.captureException(error, {
         extra: { context: 'retrieve_inventory_counts' }
       })

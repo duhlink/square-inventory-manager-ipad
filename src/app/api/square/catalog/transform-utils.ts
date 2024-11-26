@@ -57,19 +57,65 @@ export const createCategoryOptions = (categoryMap: Map<string, string>): Categor
     .sort((a, b) => a.label.localeCompare(b.label))
 }
 
+export interface VariationOption {
+  value: string
+  label: string
+  ordinal: number
+  sku: string
+  price: number
+  cost: number
+  trackInventory: boolean
+  sellable: boolean
+  stockable: boolean
+  defaultUnitCost: number
+  locationOverrides?: Array<{
+    locationId: string
+    trackInventory: boolean
+  }>
+  presentAtAllLocations: boolean
+  presentAtLocationIds?: string[]
+}
+
+export const createVariationOptions = (variations: ItemVariation[]): VariationOption[] => {
+  return variations
+    .map(variation => {
+      const variationData = variation.item_variation_data
+      return {
+        value: variation.id,
+        label: variationData?.name || '',
+        ordinal: variationData?.ordinal || 0,
+        sku: variationData?.sku || '',
+        price: safeMoneyToNumber(variationData?.price_money),
+        cost: safeMoneyToNumber(variationData?.default_unit_cost),
+        trackInventory: variationData?.track_inventory ?? false,
+        sellable: variationData?.sellable ?? false,
+        stockable: variationData?.stockable ?? false,
+        defaultUnitCost: safeMoneyToNumber(variationData?.default_unit_cost),
+        locationOverrides: variationData?.location_overrides?.map(override => ({
+          locationId: override.location_id,
+          trackInventory: override.track_inventory
+        })),
+        presentAtAllLocations: variation.present_at_all_locations,
+        presentAtLocationIds: variation.present_at_location_ids
+      }
+    })
+    .sort((a, b) => a.ordinal - b.ordinal)
+}
+
 export const mapVariations = (
   variations: ItemVariation[],
   measurementUnitMap: Map<string, string>,
   vendorMap: Map<string, string>
 ): any[] => {
   return variations.map(variation => {
-    const measurementUnitId = variation.item_variation_data?.measurement_unit_id
+    const variationData = variation.item_variation_data
+    const measurementUnitId = variationData?.measurement_unit_id
     const measurementUnit = measurementUnitId ? 
       measurementUnitMap.get(measurementUnitId) || 'unit' : 
       'unit'
 
     // Get vendor info for this variation
-    const variationVendorInfo = variation.item_variation_data?.item_variation_vendor_infos?.[0]
+    const variationVendorInfo = variationData?.item_variation_vendor_infos?.[0]
     const variationVendorId = variationVendorInfo?.item_variation_vendor_info_data?.vendor_id
     let variationVendorName = variationVendorId || 'No Vendor'
     if (variationVendorId && vendorMap.has(variationVendorId)) {
@@ -81,16 +127,26 @@ export const mapVariations = (
 
     return {
       id: variation.id,
-      name: variation.item_variation_data?.name || '',
-      sku: variation.item_variation_data?.sku || '',
-      price: safeMoneyToNumber(variation.item_variation_data?.price_money),
-      cost: 0,
+      type: variation.type,
+      name: variationData?.name || '',
+      sku: variationData?.sku || '',
+      price: safeMoneyToNumber(variationData?.price_money),
+      cost: safeMoneyToNumber(variationData?.default_unit_cost),
       measurementUnit,
-      vendorSku: variationVendorId ? `${variationVendorId}-${variation.item_variation_data?.sku}` : undefined,
+      vendorSku: variationVendorId ? `${variationVendorId}-${variationData?.sku}` : undefined,
       vendorId: variationVendorId || '',
       vendorName: variationVendorName,
-      stockable: variation.item_variation_data?.stockable ?? false,
-      quantity: 0
+      stockable: variationData?.stockable ?? false,
+      ordinal: variationData?.ordinal ?? 0,
+      trackInventory: variationData?.track_inventory ?? false,
+      sellable: variationData?.sellable ?? false,
+      defaultUnitCost: safeMoneyToNumber(variationData?.default_unit_cost),
+      locationOverrides: variationData?.location_overrides || [],
+      presentAtAllLocations: variation.present_at_all_locations,
+      presentAtLocationIds: variation.present_at_location_ids || [],
+      updatedAt: variation.updated_at,
+      createdAt: variation.created_at,
+      version: variation.version
     }
   })
 }

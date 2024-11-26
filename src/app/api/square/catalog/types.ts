@@ -12,6 +12,11 @@ export interface VendorInfo {
   item_variation_vendor_info_data: VendorInfoData
 }
 
+export interface LocationOverride {
+  location_id: string
+  track_inventory: boolean
+}
+
 export interface ItemVariationData {
   name?: string
   sku?: string
@@ -20,10 +25,22 @@ export interface ItemVariationData {
   stockable?: boolean
   inventory_alert_threshold?: number
   item_variation_vendor_infos?: VendorInfo[]
+  ordinal?: number
+  track_inventory?: boolean
+  sellable?: boolean
+  default_unit_cost?: Money
+  location_overrides?: LocationOverride[]
 }
 
 export interface ItemVariation {
   id: string
+  type: string
+  updated_at?: string
+  created_at?: string
+  version?: number
+  is_deleted: boolean
+  present_at_all_locations: boolean
+  present_at_location_ids?: string[]
   item_variation_data: ItemVariationData
 }
 
@@ -50,6 +67,8 @@ export interface CatalogItem {
   version?: number
   is_deleted: boolean
   updated_at?: string
+  present_at_all_locations: boolean
+  present_at_location_ids?: string[]
   item_data?: CatalogItemData
 }
 
@@ -70,6 +89,8 @@ export interface CatalogObject {
   version?: number
   is_deleted: boolean
   updated_at?: string
+  present_at_all_locations: boolean
+  present_at_location_ids?: string[]
   category_data?: {
     name: string
   }
@@ -91,20 +112,6 @@ export interface CatalogObject {
     }
     precision?: number
   }
-  item_data?: {
-    name: string
-    category_ids?: string[]
-    variations?: Array<{
-      id: string
-      item_variation_data?: {
-        item_variation_vendor_infos?: Array<{
-          item_variation_vendor_info_data?: {
-            vendor_id: string
-            sku?: string
-          }
-        }>
-      }
-    }>
-  }
+  item_data?: CatalogItemData
   [key: string]: any
 }
