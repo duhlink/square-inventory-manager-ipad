@@ -1,52 +1,27 @@
 import { NextResponse } from 'next/server'
-import { squareClient } from '@/services/square/config'
 import * as Sentry from '@sentry/nextjs'
-import { CatalogObject } from 'square'
+import { listCatalog } from '../axios-client'
 
 export async function GET() {
   try {
-    if (!squareClient?.catalogApi) {
-      throw new Error('Square catalog API is not properly initialized')
-    }
-
-    console.log('Fetching catalog categories...')
+    const response = await listCatalog()
+    const items = response.objects || []
     
-    // Fetch all categories using pagination
-    let allObjects: CatalogObject[] = []
-    let cursor: string | undefined
-    
-    do {
-      const { result } = await squareClient.catalogApi.listCatalog(
-        cursor,
-        'CATEGORY'
-      )
-      
-      if (result.objects) {
-        allObjects = [...allObjects, ...result.objects]
+    // Extract unique categories from catalog items
+    const categorySet = new Set<string>()
+    items.forEach(item => {
+      if (item.type === 'CATEGORY' && !item.is_deleted && item.category_data?.name) {
+        categorySet.add(item.category_data.name)
       }
-      
-      cursor = result.cursor
-    } while (cursor)
+    })
 
-    console.log(`Fetched ${allObjects.length} total categories`)
-
-    if (!allObjects.length) {
-      return NextResponse.json({
-        success: true,
-        data: []
-      })
-    }
-
-    // Map categories to the format needed by the data table
-    const categories = allObjects
-      .filter(obj => obj.type === 'CATEGORY' && !obj.isDeleted && obj.categoryData?.name)
-      .map(obj => ({
-        label: obj.categoryData!.name!,
-        value: obj.id
+    // Convert to array and sort alphabetically
+    const categories = Array.from(categorySet)
+      .sort((a, b) => a.localeCompare(b))
+      .map(name => ({
+        label: name,
+        value: name
       }))
-      .sort((a, b) => a.label.localeCompare(b.label))
-
-    console.log('Found categories:', categories)
 
     return NextResponse.json({
       success: true,
@@ -61,10 +36,10 @@ export async function GET() {
     return NextResponse.json({ 
       success: false,
       error: {
-        code: error.code || 'UNKNOWN_ERROR',
-        message: error.message || 'An unexpected error occurred',
-        details: error
+        message: error.message,
+        status: error.response?.status,
+        details: error.response?.data
       }
-    }, { status: 500 })
+    }, { status: error.response?.status || 500 })
   }
 }

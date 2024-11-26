@@ -1,23 +1,21 @@
 import fs from 'fs'
 import path from 'path'
 
-export const writeDebugToFile = (data: any, prefix: string) => {
+export function writeDebugToFile(data: any, prefix: string): void {
   try {
     const debugDir = path.join(process.cwd(), 'debug')
     if (!fs.existsSync(debugDir)) {
       fs.mkdirSync(debugDir, { recursive: true })
     }
 
-    // Truncate data to 300 lines
     const dataString = JSON.stringify(data, null, 2)
     const lines = dataString.split('\n')
-    const truncatedData = lines.slice(0, 300).join('\n')
+    const truncatedData = lines.slice(0, 100).join('\n')
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filePath = path.join(debugDir, `${prefix}-${timestamp}.json`)
     fs.writeFileSync(filePath, truncatedData)
 
-    // Get all debug files and group by prefix
     const files = fs.readdirSync(debugDir)
     const filesByPrefix = new Map<string, string[]>()
     
@@ -29,7 +27,6 @@ export const writeDebugToFile = (data: any, prefix: string) => {
       filesByPrefix.get(filePrefix)?.push(file)
     })
 
-    // Keep only the most recent file per prefix
     filesByPrefix.forEach((prefixFiles, filePrefix) => {
       const sortedFiles = prefixFiles.sort((a, b) => {
         const timeA = fs.statSync(path.join(debugDir, a)).mtime.getTime()
@@ -37,7 +34,6 @@ export const writeDebugToFile = (data: any, prefix: string) => {
         return timeB - timeA
       })
 
-      // Remove all but the most recent file for this prefix
       sortedFiles.slice(1).forEach(file => {
         try {
           fs.unlinkSync(path.join(debugDir, file))
@@ -47,7 +43,6 @@ export const writeDebugToFile = (data: any, prefix: string) => {
       })
     })
 
-    // Keep only 10 most recent files total
     const allFiles = fs.readdirSync(debugDir)
       .map(file => ({
         name: file,

@@ -1,4 +1,4 @@
-import { CatalogItem, Money, CategoryOption, ItemVariation } from './types'
+import { CatalogItem, Money, CategoryOption, ItemVariation, CatalogObject } from './types'
 
 export const safeMoneyToNumber = (money: Money | undefined | null): number => {
   if (!money?.amount) return 0
@@ -99,4 +99,53 @@ export const getVendorName = (vendorId: string | undefined, vendorMap: Map<strin
   if (!vendorId) return 'No Vendor'
   const name = vendorMap.get(vendorId)
   return (name && name.trim()) ? name : vendorId
+}
+
+export function extractImageUrls(objects: CatalogObject[]): Map<string, string> {
+  const imageMap = new Map<string, string>()
+  
+  objects
+    .filter(obj => obj.type === 'IMAGE' && !obj.is_deleted)
+    .forEach(image => {
+      if (image.id && image.image_data?.url) {
+        imageMap.set(image.id, image.image_data.url)
+      }
+    })
+
+  return imageMap
+}
+
+export function extractMeasurementUnits(objects: CatalogObject[]): Map<string, string> {
+  const unitMap = new Map<string, string>()
+  
+  objects
+    .filter(obj => obj.type === 'MEASUREMENT_UNIT' && !obj.is_deleted)
+    .forEach(unit => {
+      if (unit.id && unit.measurement_unit_data?.measurement_unit) {
+        const measurementUnit = unit.measurement_unit_data.measurement_unit
+        let unitName = ''
+
+        if (measurementUnit.custom_unit?.name) {
+          unitName = measurementUnit.custom_unit.name
+        } else if (measurementUnit.area_unit) {
+          unitName = measurementUnit.area_unit.toLowerCase()
+        } else if (measurementUnit.length_unit) {
+          unitName = measurementUnit.length_unit.toLowerCase()
+        } else if (measurementUnit.volume_unit) {
+          unitName = measurementUnit.volume_unit.toLowerCase()
+        } else if (measurementUnit.weight_unit) {
+          unitName = measurementUnit.weight_unit.toLowerCase()
+        } else if (measurementUnit.generic_unit) {
+          unitName = measurementUnit.generic_unit.toLowerCase()
+        } else if (measurementUnit.time_unit) {
+          unitName = measurementUnit.time_unit.toLowerCase()
+        } else {
+          unitName = 'unit'
+        }
+
+        unitMap.set(unit.id, unitName)
+      }
+    })
+
+  return unitMap
 }

@@ -1,7 +1,7 @@
 import { CatalogObject } from 'square'
-import { VendorExtractResult, VendorInfo } from './vendor-types'
-import fs from 'fs'
-import path from 'path'
+import { VendorExtractResult, VendorInfo, VendorResponseDebug } from './vendor-types'
+import { axiosClient } from './axios-client'
+import { writeDebugToFile } from './debug-utils'
 
 interface ExtendedItemVariationData {
   item_variation_vendor_infos?: VendorInfo[]
@@ -37,71 +37,77 @@ interface ItemVendorDetail {
   }>
 }
 
-// Helper function to write debug data with limits
-const writeDebugToFile = (data: any, prefix: string) => {
+interface Vendor {
+  id: string
+  name?: string
+  status?: string
+  created_at?: string
+  updated_at?: string
+}
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+export async function bulkRetrieveVendors(vendorIds: string[]): Promise<Map<string, string>> {
   try {
-    const debugDir = path.join(process.cwd(), 'debug')
-    if (!fs.existsSync(debugDir)) {
-      fs.mkdirSync(debugDir, { recursive: true })
+    if (!vendorIds.length) {
+      console.log('No vendor IDs to retrieve')
+      return new Map()
     }
 
-    // Truncate data to 300 lines
-    const dataString = JSON.stringify(data, null, 2)
-    const lines = dataString.split('\n')
-    const truncatedData = lines.slice(0, 300).join('\n')
+    console.log(`Attempting to retrieve vendors for IDs:`, vendorIds)
 
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-    const filePath = path.join(debugDir, `${prefix}-${timestamp}.json`)
-    fs.writeFileSync(filePath, truncatedData)
-
-    // Get all debug files and group by prefix
-    const files = fs.readdirSync(debugDir)
-    const filesByPrefix = new Map<string, string[]>()
+    const vendorMap = new Map<string, string>()
     
-    files.forEach(file => {
-      const filePrefix = file.split('-')[0]
-      if (!filesByPrefix.has(filePrefix)) {
-        filesByPrefix.set(filePrefix, [])
-      }
-      filesByPrefix.get(filePrefix)?.push(file)
-    })
-
-    // Keep only the most recent file per prefix
-    filesByPrefix.forEach((prefixFiles, filePrefix) => {
-      const sortedFiles = prefixFiles.sort((a, b) => {
-        const timeA = fs.statSync(path.join(debugDir, a)).mtime.getTime()
-        const timeB = fs.statSync(path.join(debugDir, b)).mtime.getTime()
-        return timeB - timeA
-      })
-
-      // Remove all but the most recent file for this prefix
-      sortedFiles.slice(1).forEach(file => {
-        try {
-          fs.unlinkSync(path.join(debugDir, file))
-        } catch (error) {
-          console.error(`Error removing old debug file ${file}:`, error)
-        }
-      })
-    })
-
-    // Keep only 10 most recent files total
-    const allFiles = fs.readdirSync(debugDir)
-      .map(file => ({
-        name: file,
-        time: fs.statSync(path.join(debugDir, file)).mtime.getTime()
-      }))
-      .sort((a, b) => b.time - a.time)
-
-    allFiles.slice(10).forEach(file => {
+    for (const vendorId of vendorIds) {
       try {
-        fs.unlinkSync(path.join(debugDir, file.name))
-      } catch (error) {
-        console.error(`Error removing old debug file ${file.name}:`, error)
-      }
-    })
+        const response = await axiosClient.get<{ vendor?: Vendor }>(`/vendors/${vendorId}`)
+        
+        const debugInfo: VendorResponseDebug = {
+          request: {
+            vendor_ids: [vendorId],
+            timestamp: new Date().toISOString()
+          },
+          response: {
+            vendors: response.data.vendor ? [{
+              ...response.data.vendor,
+              retrieved_at: new Date().toISOString()
+            }] : undefined
+          }
+        }
+        writeDebugToFile(debugInfo, `vendor-response-${vendorId}`)
 
-  } catch (error) {
-    console.error(`Error writing debug file for ${prefix}:`, error)
+        if (response.data.vendor) {
+          const name = response.data.vendor.name?.trim()
+          vendorMap.set(vendorId, name || vendorId)
+        } else {
+          console.warn(`No vendor data returned for ID: ${vendorId}`)
+          vendorMap.set(vendorId, vendorId)
+        }
+
+        await delay(200)
+
+      } catch (error) {
+        console.error(`Error retrieving vendor ${vendorId}:`, error)
+        vendorMap.set(vendorId, vendorId)
+      }
+    }
+
+    writeDebugToFile({
+      total_requested: vendorIds.length,
+      total_retrieved: vendorMap.size,
+      vendor_mappings: Array.from(vendorMap.entries()).map(([id, name]) => ({
+        id,
+        name
+      }))
+    }, 'vendor-mappings')
+
+    return vendorMap
+
+  } catch (error: unknown) {
+    console.error('Error in vendor retrieve:', error)
+    const vendorMap = new Map<string, string>()
+    vendorIds.forEach(id => vendorMap.set(id, id))
+    return vendorMap
   }
 }
 
@@ -125,7 +131,6 @@ export function extractVendorId(itemData: ItemData): string | undefined {
         })
 
         if (vendorInfo?.vendor_id) {
-          // Log detailed vendor information
           writeDebugToFile({
             item_name: itemData.name,
             variation_details: vendorDetails
@@ -151,7 +156,6 @@ export function processVendorData(activeItems: CatalogObject[]): VendorExtractRe
     if (vendorId) {
       itemVendorMap.set(item.id, vendorId)
       
-      // Collect detailed vendor information
       const variations = (item.itemData as ItemData)?.variations || []
       const itemVendorDetail: ItemVendorDetail = {
         item_id: item.id,
@@ -170,7 +174,6 @@ export function processVendorData(activeItems: CatalogObject[]): VendorExtractRe
 
   const vendorIds = new Set<string>(Array.from(itemVendorMap.values()))
   
-  // Log processed vendor data
   writeDebugToFile({
     total_items: activeItems.length,
     items_with_vendors: itemVendorMap.size,

@@ -2,6 +2,12 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // Remove static route badge
+  devIndicators: {
+    buildActivity: true,
+    buildActivityPosition: 'bottom-right',
+  },
+
   webpack: (config, { dev, isServer }) => {
     // Production optimizations
     if (!dev) {

@@ -63,3 +63,48 @@ export interface ItemCategoryMapping {
   item_name?: string
   category_ids: string[]
 }
+
+export interface CatalogObject {
+  id: string
+  type: string
+  version?: number
+  is_deleted: boolean
+  updated_at?: string
+  category_data?: {
+    name: string
+  }
+  image_data?: {
+    url?: string
+  }
+  measurement_unit_data?: {
+    measurement_unit?: {
+      custom_unit?: {
+        name: string
+      }
+      area_unit?: string
+      length_unit?: string
+      volume_unit?: string
+      weight_unit?: string
+      generic_unit?: string
+      time_unit?: string
+      type?: string
+    }
+    precision?: number
+  }
+  item_data?: {
+    name: string
+    category_ids?: string[]
+    variations?: Array<{
+      id: string
+      item_variation_data?: {
+        item_variation_vendor_infos?: Array<{
+          item_variation_vendor_info_data?: {
+            vendor_id: string
+            sku?: string
+          }
+        }>
+      }
+    }>
+  }
+  [key: string]: any
+}

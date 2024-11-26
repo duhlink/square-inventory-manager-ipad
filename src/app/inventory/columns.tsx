@@ -108,7 +108,7 @@ export const columns: ColumnDef<InventoryItem>[] = [
     ),
     cell: ({ row }) => {
       const categories = row.original.categories || []
-      if (!categories.length) return <span className="text-muted-foreground text-sm">No categories</span>
+      if (!categories.length) return <span className="text-muted-foreground text-sm pl-1">No categories</span>
 
       return (
         <div className="w-[180px]">
@@ -116,7 +116,7 @@ export const columns: ColumnDef<InventoryItem>[] = [
             <DropdownMenuTrigger asChild>
               <Button 
                 variant="ghost" 
-                className="h-8 w-[180px] justify-start px-2.5 font-normal hover:bg-accent hover:text-accent-foreground group"
+                className="h-8 w-[180px] justify-start pl-1 pr-2.5 font-normal hover:bg-accent hover:text-accent-foreground group"
               >
                 <div className="flex items-center w-full">
                   <div className="border rounded px-2 py-0.5 flex-1 truncate min-w-0 text-xs mr-2">
@@ -132,8 +132,6 @@ export const columns: ColumnDef<InventoryItem>[] = [
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[180px]">
-              <DropdownMenuLabel>Categories</DropdownMenuLabel>
-              <DropdownMenuSeparator />
               {categories.map((category, index) => (
                 <DropdownMenuItem key={index} className="text-sm">
                   {category}

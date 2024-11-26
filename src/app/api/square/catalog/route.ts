@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
-import { listCatalog, bulkRetrieveVendors, retrieveCategories, extractImageUrls, extractMeasurementUnits } from './axios-client'
+import { listCatalog, retrieveCategories } from './axios-client'
+import { bulkRetrieveVendors } from './vendor-utils'
+import { extractImageUrls, extractMeasurementUnits } from './transform-utils'
 import { CatalogItem, ItemVariation } from './types'
 import {
   writeDebugToFile,
@@ -12,6 +14,10 @@ import {
   mapVariations,
   getVendorName
 } from './utils'
+import { inventoryService } from '@/services/square/inventory'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export async function GET() {
   try {
@@ -32,6 +38,7 @@ export async function GET() {
     const vendorIds = new Set<string>()
     const categoryIds = new Set<string>()
     const itemCategoryMap = new Map<string, string[]>()
+    const itemVariations: { catalogItemId: string, variationId: string }[] = []
     
     activeItems.forEach(item => {
       const itemCategoryIds = extractCategoryIds(item)
@@ -42,6 +49,12 @@ export async function GET() {
 
       const variations = item.item_data?.variations || []
       variations.forEach((variation: ItemVariation) => {
+        if (variation.id) {
+          itemVariations.push({
+            catalogItemId: item.id,
+            variationId: variation.id
+          })
+        }
         const vendorInfo = variation.item_variation_data?.item_variation_vendor_infos?.[0]
         if (vendorInfo?.item_variation_vendor_info_data?.vendor_id) {
           vendorIds.add(vendorInfo.item_variation_vendor_info_data.vendor_id)
@@ -61,16 +74,22 @@ export async function GET() {
       }))
     }, 'category-collection')
 
-    const [vendorMap, categoryMap] = await Promise.all([
+    const [vendorMap, categoryMap, inventoryResponse] = await Promise.all([
       bulkRetrieveVendors(Array.from(vendorIds)),
-      retrieveCategories(Array.from(categoryIds))
+      retrieveCategories(Array.from(categoryIds)),
+      inventoryService.retrieveInventoryCounts(itemVariations)
     ])
+
+    // Initialize inventory counts with a default empty Map if the response wasn't successful
+    const inventoryCounts: Map<string, number> = inventoryResponse.success && inventoryResponse.data instanceof Map 
+      ? inventoryResponse.data 
+      : new Map<string, number>()
 
     writeDebugToFile({
       total_categories: categoryIds.size,
-      category_mappings: Array.from(categoryMap.entries()).map(([id, name]) => ({
-        category_id: id,
-        category_name: name
+      category_mappings: Array.from(categoryMap.entries()).map((entry: [string, string]) => ({
+        category_id: entry[0],
+        category_name: entry[1]
       })),
       raw_category_ids: Array.from(categoryIds)
     }, 'category-mapping')
@@ -91,16 +110,21 @@ export async function GET() {
 
       const mappedVariations = mapVariations(variations, measurementUnitMap, vendorMap)
 
+      // Calculate total quantity across all variations
+      const quantity = variations.reduce((total, variation) => {
+        return total + (inventoryCounts.get(variation.id || '') || 0)
+      }, 0)
+
       return {
         id: item.id,
         name: item.item_data?.name || '',
         description: item.item_data?.description || '',
         sku: firstVariation?.item_variation_data?.sku || '',
-        categories: categoryNames,  // Keep as array for table component
-        categoryIds,    // Raw category IDs for filtering
+        categories: categoryNames,
+        categoryIds,
         price: safeMoneyToNumber(firstVariation?.item_variation_data?.price_money),
         unitCost: 0,
-        quantity: 0,
+        quantity,
         reorderPoint: Number(firstVariation?.item_variation_data?.inventory_alert_threshold || 0),
         vendorId: vendorId || '',
         vendorName,

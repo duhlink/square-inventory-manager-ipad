@@ -6,6 +6,19 @@ import { columns } from "./columns"
 import { InventoryItem } from "./types"
 import { LoadingState, StatusMessage } from "@/components/ui/loading-state"
 
+const defaultColumnWidths = {
+  image: 40,
+  name: 100,
+  variations: 120,
+  categories: 180,
+  quantity: 60,
+  unitType: 80,
+  price: 80,
+  unitCost: 80,
+  vendorName: 120,
+  actions: 40
+}
+
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -21,8 +34,11 @@ export default function InventoryPage() {
         setStatus({ message: "Fetching inventory data...", type: "info" })
 
         const response = await fetch('/api/square/catalog')
-        const result = await response.json()
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
         
+        const result = await response.json()
         if (!result.success) {
           throw new Error(result.error?.message || 'Failed to fetch inventory')
         }
@@ -30,7 +46,6 @@ export default function InventoryPage() {
         setInventory(result.data)
         setStatus({ message: "Inventory loaded successfully", type: "success" })
 
-        // Clear success message after 3 seconds
         setTimeout(() => {
           setStatus(null)
         }, 3000)
@@ -70,6 +85,8 @@ export default function InventoryPage() {
             <DataTable 
               data={inventory} 
               columns={columns}
+              tableId="inventory"
+              defaultColumnWidths={defaultColumnWidths}
               filterableColumns={[
                 {
                   id: "categories",
