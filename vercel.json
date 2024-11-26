@@ -2,9 +2,38 @@
   "framework": "nextjs",
   "buildCommand": "next build",
   "installCommand": "npm install",
-  "env": {
-    "NEXT_PUBLIC_SQUARE_ACCESS_TOKEN": "@next_public_square_access_token",
-    "NEXT_PUBLIC_SQUARE_APPLICATION_ID": "@next_public_square_application_id",
-    "NEXT_PUBLIC_SQUARE_ENVIRONMENT": "@next_public_square_environment"
-  }
+  "routes": [
+    {
+      "src": "/catalog",
+      "dest": "src/app/catalog/page"
+    },
+    {
+      "src": "/api/square/catalog",
+      "dest": "src/app/api/square/catalog/route"
+    },
+    {
+      "src": "/api/square/catalog/categories",
+      "dest": "src/app/api/square/catalog/categories/route"
+    },
+    {
+      "src": "/api/square/catalog/vendors",
+      "dest": "src/app/api/square/catalog/vendors/route"
+    },
+    {
+      "src": "/api/square/inventory",
+      "dest": "src/app/api/square/inventory/route"
+    },
+    {
+      "src": "/api/square/inventory/counts",
+      "dest": "src/app/api/square/inventory/counts/route"
+    },
+    {
+      "src": "/api/square/vendors",
+      "dest": "src/app/api/square/vendors/route"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "src/app/$1"
+    }
+  ]
 }
