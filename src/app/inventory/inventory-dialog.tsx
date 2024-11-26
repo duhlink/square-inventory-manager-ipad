@@ -37,12 +37,17 @@ const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
   sku: z.string().min(1, "SKU is required"),
-  category: z.string().min(1, "Category is required"),
+  categories: z.array(z.string()).min(1, "At least one category is required"),
   price: z.coerce.number().min(0, "Price must be a positive number"),
-  cost: z.coerce.number().min(0, "Cost must be a positive number"),
+  unitCost: z.coerce.number().min(0, "Cost must be a positive number"),
   quantity: z.coerce.number().min(0, "Quantity must be a positive number"),
   reorderPoint: z.coerce.number().min(0, "Reorder point must be a positive number"),
-  vendor: z.string().min(1, "Vendor is required"),
+  vendorId: z.string().min(1, "Vendor is required"),
+  vendorName: z.string().min(1, "Vendor name is required"),
+  unitType: z.string().min(1, "Unit type is required"),
+  trackInventory: z.boolean().default(true),
+  visibility: z.enum(['PUBLIC', 'PRIVATE']).default('PUBLIC'),
+  isTaxable: z.boolean().default(true)
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -63,12 +68,17 @@ export function InventoryDialog({ open, onOpenChange, item }: InventoryDialogPro
       name: item?.name || "",
       description: item?.description || "",
       sku: item?.sku || "",
-      category: item?.category || "",
+      categories: item?.categories || [],
       price: item?.price || 0,
-      cost: item?.cost || 0,
+      unitCost: item?.unitCost || 0,
       quantity: item?.quantity || 0,
       reorderPoint: item?.reorderPoint || 0,
-      vendor: item?.vendor || "",
+      vendorId: item?.vendorId || "",
+      vendorName: item?.vendorName || "",
+      unitType: item?.unitType || "",
+      trackInventory: item?.trackInventory ?? true,
+      visibility: item?.visibility || 'PUBLIC',
+      isTaxable: item?.isTaxable ?? true
     },
   })
 
@@ -157,11 +167,14 @@ export function InventoryDialog({ open, onOpenChange, item }: InventoryDialogPro
             />
             <FormField
               control={form.control}
-              name="category"
+              name="categories"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormLabel>Categories</FormLabel>
+                  <Select 
+                    onValueChange={(value) => field.onChange([value])} 
+                    defaultValue={field.value?.[0]}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a category" />
@@ -193,10 +206,10 @@ export function InventoryDialog({ open, onOpenChange, item }: InventoryDialogPro
               />
               <FormField
                 control={form.control}
-                name="cost"
+                name="unitCost"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Cost</FormLabel>
+                    <FormLabel>Unit Cost</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" {...field} />
                     </FormControl>
@@ -235,13 +248,49 @@ export function InventoryDialog({ open, onOpenChange, item }: InventoryDialogPro
             </div>
             <FormField
               control={form.control}
-              name="vendor"
+              name="vendorId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Vendor</FormLabel>
+                  <FormLabel>Vendor ID</FormLabel>
                   <FormControl>
                     <Input {...field} />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="vendorName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Vendor Name</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="unitType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Unit Type</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a unit type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="each">Each</SelectItem>
+                      <SelectItem value="pound">Pound</SelectItem>
+                      <SelectItem value="ounce">Ounce</SelectItem>
+                      <SelectItem value="case">Case</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

@@ -5,6 +5,24 @@ import { useToast } from '@/components/ui/use-toast'
 import { InventoryItem, InventoryAction } from './types'
 import * as Sentry from '@sentry/nextjs'
 
+// Define what properties are required when adding a new item
+type NewInventoryItem = {
+  name: string
+  description?: string // Make description optional
+  sku: string
+  categories: string[]
+  price: number
+  unitCost: number
+  quantity: number
+  reorderPoint: number
+  vendorId: string
+  vendorName: string
+  unitType: string
+  trackInventory: boolean
+  visibility: 'PUBLIC' | 'PRIVATE'
+  isTaxable: boolean
+}
+
 interface InventoryContextType {
   items: InventoryItem[]
   loading: boolean
@@ -13,6 +31,7 @@ interface InventoryContextType {
   refreshInventory: () => Promise<void>
   updateItem: (item: InventoryItem) => Promise<void>
   deleteItem: (itemId: string) => Promise<void>
+  addItem: (item: NewInventoryItem) => Promise<void>
 }
 
 const InventoryContext = createContext<InventoryContextType | undefined>(undefined)
@@ -91,6 +110,73 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false)
       console.log('Inventory fetch complete')
+    }
+  }, [toast])
+
+  const addItem = useCallback(async (newItem: NewInventoryItem) => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      // Add default values for required fields
+      const itemToAdd = {
+        ...newItem,
+        categoryIds: [], // Will be populated by the API
+        vendorCode: '', // Will be populated by the API
+        measurementUnitId: '', // Will be populated by the API
+        lastUpdated: new Date().toISOString(),
+        updatedBy: 'current-user',
+        squareId: '', // Will be populated by the API
+        squareCatalogVersion: 0, // Will be populated by the API
+        squareUpdatedAt: new Date().toISOString(),
+        variations: [] // Will be populated by the API
+      }
+
+      const response = await fetch('/api/square/catalog', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(itemToAdd)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error?.message || `Failed to add item: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (!data.success || !data.data) {
+        throw new Error(data.error?.message || 'Failed to add item')
+      }
+
+      setItems(prev => [...prev, data.data])
+
+      logAction({
+        itemId: data.data.id,
+        action: 'create',
+        userId: 'current-user',
+        userName: 'Current User'
+      })
+
+      toast({
+        title: "Success",
+        description: `${newItem.name} has been added successfully.`
+      })
+
+    } catch (err: any) {
+      const errorDetails = logError(err, 'add_item', { newItem })
+      const errorMessage = errorDetails.message || 'Failed to add item'
+      
+      setError(errorMessage)
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: errorMessage
+      })
+
+    } finally {
+      setLoading(false)
     }
   }, [toast])
 
@@ -215,7 +301,8 @@ export function InventoryProvider({ children }: { children: React.ReactNode }) {
     actions,
     refreshInventory,
     updateItem,
-    deleteItem
+    deleteItem,
+    addItem
   }
 
   return (
