@@ -8,6 +8,15 @@ const nextConfig = {
     buildActivityPosition: 'bottom-right',
   },
 
+  // Output standalone build for better Vercel compatibility
+  output: 'standalone',
+
+  // Optimize production builds
+  experimental: {
+    optimizeCss: true,
+    esmExternals: true
+  },
+
   webpack: (config, { dev, isServer }) => {
     // Production optimizations
     if (!dev) {
@@ -149,15 +158,7 @@ const nextConfig = {
     maxInactiveAge: 15 * 1000,
     // number of pages that should be kept simultaneously without being disposed
     pagesBufferLength: 2,
-  },
-
-  // Optimize production builds
-  experimental: {
-    // Enable modern build optimizations
-    optimizeCss: true,
-    // Enable module federation for better code splitting
-    esmExternals: true
-  },
+  }
 }
 
 // Injected content via Sentry wizard below

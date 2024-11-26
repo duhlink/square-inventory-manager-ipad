@@ -3,9 +3,13 @@ import { CatalogObject } from './types'
 import { writeDebugToFile } from './debug-utils'
 
 const SQUARE_API_URL = 'https://connect.squareup.com/v2'
-const SQUARE_ACCESS_TOKEN = 'EAAAl7jn6--qEQf4iuFDvdTLzYgWNwIxBRj5HkBIm_vGcZuAzkmq95dLi8W-QqaE'
+const SQUARE_ACCESS_TOKEN = process.env.NEXT_PUBLIC_SQUARE_ACCESS_TOKEN
 const MAX_RETRIES = 3
 const INITIAL_RETRY_DELAY = 1000
+
+if (!SQUARE_ACCESS_TOKEN) {
+  throw new Error('NEXT_PUBLIC_SQUARE_ACCESS_TOKEN is not configured')
+}
 
 interface SquareResponse {
   objects?: CatalogObject[]

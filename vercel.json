@@ -1,0 +1,33 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "functions": {
+    "src/app/**/*": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  },
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_SQUARE_ACCESS_TOKEN": "@next_public_square_access_token",
+      "NEXT_PUBLIC_SQUARE_APPLICATION_ID": "@next_public_square_application_id",
+      "NEXT_PUBLIC_SQUARE_ENVIRONMENT": "@next_public_square_environment"
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/src/app/$1" }
+  ],
+  "routes": [
+    {
+      "src": "/catalog",
+      "dest": "/src/app/catalog/page.tsx"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/src/app/$1"
+    }
+  ]
+}
